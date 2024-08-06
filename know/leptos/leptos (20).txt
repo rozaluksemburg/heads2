@@ -1,0 +1,486 @@
+m or to many of the other things the standard library may be used to having. Not every crate can even be compiled to WASM, let alone run in a WASM environment.
+
+In particular, you’ll sometimes see errors about the crate mio or missing things from core. This is generally a sign that you are trying to compile something to WASM that can’t be compiled to WASM. If you’re adding server-only dependencies, you’ll want to mark them optional = true in your Cargo.toml and then enable them in the ssr feature definition. (Check out one of the template Cargo.toml files to see more details.)
+
+You can use create_effect to specify that something should only run on the client, and not in the server. Is there a way to specify that something should run only on the server, and not the client?
+
+In fact, there is. The next chapter will cover the topic of server functions in some detail. (In the meantime, you can check out their docs here.)
+
+Crate leptos_serverCopy item path
+source · [−]
+Structs
+Action	An action synchronizes an imperative async call to the synchronous reactive system.
+MultiAction	An action that synchronizes multiple imperative async calls to the reactive system, tracking the progress of each one.
+Submission	An action that has been submitted by dispatching it to a MultiAction.
+Enums
+ServerFnError	Type for errors that can occur when using server functions.
+ServerFnErrorErr	Type for errors that can occur when using server functions.
+Functions
+create_action	Creates an Action to synchronize an imperative async call to the synchronous reactive system.
+create_multi_action	Creates an MultiAction to synchronize an imperative async call to the synchronous reactive system.
+create_server_action	Creates an Action that can be used to call a server function.
+create_server_multi_action	Creates an MultiAction that can be used to call a server function.
+
+Struct leptos_server::ActionCopy item path
+source · [−]
+pub struct Action<I, O>(/* private fields */)
+where
+    I: 'static,
+    O: 'static;
+An action synchronizes an imperative async call to the synchronous reactive system.
+
+If you’re trying to load data by running an async function reactively, you probably want to use a Resource instead. If you’re trying to occasionally run an async function in response to something like a user clicking a button, you’re in the right place.
+
+async fn send_new_todo_to_api(task: String) -> usize {
+    // do something...
+    // return a task id
+    42
+}
+let save_data = create_action(|task: &String| {
+  // `task` is given as `&String` because its value is available in `input`
+  send_new_todo_to_api(task.clone())
+});
+
+// the argument currently running
+let input = save_data.input();
+// the most recent returned result
+let result_of_call = save_data.value();
+// whether the call is pending
+let pending = save_data.pending();
+// how many times the action has run
+// useful for reactively updating something else in response to a `dispatch` and response
+let version = save_data.version();
+
+// before we do anything
+assert_eq!(input.get(), None); // no argument yet
+assert_eq!(pending.get(), false); // isn't pending a response
+assert_eq!(result_of_call.get(), None); // there's no "last value"
+assert_eq!(version.get(), 0);
+// dispatch the action
+save_data.dispatch("My todo".to_string());
+
+// when we're making the call
+// assert_eq!(input.get(), Some("My todo".to_string()));
+// assert_eq!(pending.get(), true); // is pending
+// assert_eq!(result_of_call.get(), None); // has not yet gotten a response
+
+// after call has resolved
+assert_eq!(input.get(), None); // input clears out after resolved
+assert_eq!(pending.get(), false); // no longer pending
+assert_eq!(result_of_call.get(), Some(42));
+assert_eq!(version.get(), 1);
+The input to the async function should always be a single value, but it can be of any type. The argument is always passed by reference to the function, because it is stored in Action::input as well.
+
+// if there's a single argument, just use that
+let action1 = create_action(|input: &String| {
+    let input = input.clone();
+    async move { todo!() }
+});
+
+// if there are no arguments, use the unit type `()`
+let action2 = create_action(|input: &()| async { todo!() });
+
+// if there are multiple arguments, use a tuple
+let action3 = create_action(|input: &(usize, String)| async { todo!() });
+Implementations
+source
+impl<I, O> Action<I, O>
+where
+    I: 'static,
+    O: 'static,
+source
+pub fn dispatch(&self, input: I)
+Calls the async function with a reference to the input type as its argument.
+
+source
+pub fn new<F, Fu>(action_fn: F) -> Self
+where
+    F: Fn(&I) -> Fu + 'static,
+    Fu: Future<Output = O> + 'static,
+Create an Action.
+
+Action is a type of Signal which represent imperative calls to an asynchronous function. Where a Resource is driven as a function of a Signal, Actions are Action::dispatched by events or handlers.
+
+
+let act = Action::new(|n: &u8| {
+    let n = n.to_owned();
+    async move { n * 2 }
+});
+act.dispatch(3);
+assert_eq!(act.value().get(), Some(6));
+
+// Remember that async functions already return a future if they are
+// not `await`ed. You can save keystrokes by leaving out the `async move`
+
+let act2 = Action::new(|n: &String| yell(n.to_owned()));
+act2.dispatch(String::from("i'm in a doctest"));
+assert_eq!(act2.value().get(), Some("I'M IN A DOCTEST".to_string()));
+
+async fn yell(n: String) -> String {
+    n.to_uppercase()
+}
+source
+pub fn pending(&self) -> ReadSignal<bool>
+Whether the action has been dispatched and is currently waiting for its future to be resolved.
+
+source
+pub fn set_pending(&self, pending: bool)
+Updates whether the action is currently pending. If the action has been dispatched multiple times, and some of them are still pending, it will not update the pending signal.
+
+source
+pub fn url(&self) -> Option<String>
+The URL associated with the action (typically as part of a server function.) This enables integration with the ActionForm component in leptos_router.
+
+source
+pub fn version(&self) -> RwSignal<usize>
+How many times the action has successfully resolved.
+
+source
+pub fn input(&self) -> RwSignal<Option<I>>
+The current argument that was dispatched to the async function. Some while we are waiting for it to resolve, None if it has resolved.
+
+source
+pub fn value(&self) -> RwSignal<Option<O>>
+The most recent return value of the async function.
+
+source
+impl<I> Action<I, Result<I::Output, ServerFnError<I::Error>>>
+where
+    I: ServerFn + 'static,
+source
+pub fn server() -> Action<I, Result<I::Output, ServerFnError<I::Error>>>
+where
+    I: ServerFn + Clone,
+    I::Error: Clone + 'static,
+Create an Action to imperatively call a server function.
+
+The struct representing your server function’s arguments should be provided to the Action. Unless specified as an argument to the server macro, the generated struct is your function’s name converted to CamelCase.
+
+
+// The type argument can be on the right of the equal sign.
+let act = Action::<Add, _>::server();
+let args = Add { lhs: 5, rhs: 7 };
+act.dispatch(args);
+assert_eq!(act.value().get(), Some(Ok(12)));
+
+// Or on the left of the equal sign.
+let act: Action<Sub, _> = Action::server();
+let args = Sub { lhs: 20, rhs: 5 };
+act.dispatch(args);
+assert_eq!(act.value().get(), Some(Ok(15)));
+
+let not_dispatched = Action::<Add, _>::server();
+assert_eq!(not_dispatched.value().get(), None);
+
+#[server]
+async fn add(lhs: u8, rhs: u8) -> Result<u8, ServerFnError> {
+    Ok(lhs + rhs)
+}
+
+#[server]
+async fn sub(lhs: u8, rhs: u8) -> Result<u8, ServerFnError> {
+    Ok(lhs - rhs)
+}
+source
+pub fn using_server_fn(self) -> Self
+where
+    I::Error: Clone + 'static,
+Associates the URL of the given server function with this action. This enables integration with the ActionForm component in leptos_router.
+
+Trait Implementations
+source
+impl<I, O> Clone for Action<I, O>
+where
+    I: 'static,
+    O: 'static,
+source
+fn clone(&self) -> Self
+Returns a copy of the value. Read more
+1.0.0 · source
+fn clone_from(&mut self, source: &Self)
+Performs copy-assignment from source. Read more
+source
+impl<I, O> Copy for Action<I, O>
+where
+    I: 'static,
+    O: 'static,
+Auto Trait Implementations
+impl<I, O> Freeze for Action<I, O>
+impl<I, O> !RefUnwindSafe for Action<I, O>
+impl<I, O> !Send for Action<I, O>
+impl<I, O> !Sync for Action<I, O>
+impl<I, O> Unpin for Action<I, O>
+where
+    I: Unpin,
+    O: Unpin,
+impl<I, O> !UnwindSafe for Action<I, O>
+Blanket Implementations
+source
+impl<T> Any for T
+where
+    T: 'static + ?Sized,
+source
+impl<T> Borrow<T> for T
+where
+    T: ?Sized,
+source
+impl<T> BorrowMut<T> for T
+where
+    T: ?Sized,
+source
+impl<T> From<T> for T
+source
+impl<T> Instrument for T
+source
+impl<T, U> Into<U> for T
+where
+    U: From<T>,
+source
+impl<T> ToOwned for T
+where
+    T: Clone,
+source
+impl<T, U> TryFrom<U> for T
+where
+    U: Into<T>,
+source
+impl<T, U> TryInto<U> for T
+where
+    U: TryFrom<T>,
+source
+impl<T> WithSubscriber for T
+
+Struct leptos_server::MultiActionCopy item path
+source · [−]
+pub struct MultiAction<I, O>(/* private fields */)
+where
+    I: 'static,
+    O: 'static;
+An action that synchronizes multiple imperative async calls to the reactive system, tracking the progress of each one.
+
+Where an Action fires a single call, a MultiAction allows you to keep track of multiple in-flight actions.
+
+If you’re trying to load data by running an async function reactively, you probably want to use a Resource instead. If you’re trying to occasionally run an async function in response to something like a user adding a task to a todo list, you’re in the right place.
+
+async fn send_new_todo_to_api(task: String) -> usize {
+  // do something...
+  // return a task id
+  42
+}
+let add_todo = create_multi_action(|task: &String| {
+  // `task` is given as `&String` because its value is available in `input`
+  send_new_todo_to_api(task.clone())
+});
+
+add_todo.dispatch("Buy milk".to_string());
+add_todo.dispatch("???".to_string());
+add_todo.dispatch("Profit!!!".to_string());
+The input to the async function should always be a single value, but it can be of any type. The argument is always passed by reference to the function, because it is stored in Submission::input as well.
+
+// if there's a single argument, just use that
+let action1 = create_multi_action(|input: &String| {
+    let input = input.clone();
+    async move { todo!() }
+});
+
+// if there are no arguments, use the unit type `()`
+let action2 = create_multi_action(|input: &()| async { todo!() });
+
+// if there are multiple arguments, use a tuple
+let action3 =
+    create_multi_action(|input: &(usize, String)| async { todo!() });
+Implementations
+source
+impl<I, O> MultiAction<I, O>
+where
+    I: 'static,
+    O: 'static,
+source
+pub fn dispatch(&self, input: I)
+Calls the async function with a reference to the input type as its argument.
+
+source
+pub fn submissions(&self) -> ReadSignal<Vec<Submission<I, O>>>
+The set of all submissions to this multi-action.
+
+source
+pub fn url(&self) -> Option<String>
+The URL associated with the action (typically as part of a server function.) This enables integration with the MultiActionForm component in leptos_router.
+
+source
+pub fn version(&self) -> RwSignal<usize>
+How many times an action has successfully resolved.
+
+source
+pub fn using_server_fn<T: ServerFn>(self) -> Self
+Associates the URL of the given server function with this action. This enables integration with the MultiActionForm component in leptos_router.
+
+Trait Implementations
+source
+impl<I, O> Clone for MultiAction<I, O>
+where
+    I: 'static,
+    O: 'static,
+source
+fn clone(&self) -> Self
+Returns a copy of the value. Read more
+1.0.0 · source
+fn clone_from(&mut self, source: &Self)
+Performs copy-assignment from source. Read more
+source
+impl<I, O> Copy for MultiAction<I, O>
+where
+    I: 'static,
+    O: 'static,
+Auto Trait Implementations
+impl<I, O> Freeze for MultiAction<I, O>
+impl<I, O> !RefUnwindSafe for MultiAction<I, O>
+impl<I, O> !Send for MultiAction<I, O>
+impl<I, O> !Sync for MultiAction<I, O>
+impl<I, O> Unpin for MultiAction<I, O>
+where
+    I: Unpin,
+    O: Unpin,
+impl<I, O> !UnwindSafe for MultiAction<I, O>
+Blanket Implementations
+source
+impl<T> Any for T
+where
+    T: 'static + ?Sized,
+source
+impl<T> Borrow<T> for T
+where
+    T: ?Sized,
+source
+impl<T> BorrowMut<T> for T
+where
+    T: ?Sized,
+source
+impl<T> From<T> for T
+source
+impl<T> Instrument for T
+source
+impl<T, U> Into<U> for T
+where
+    U: From<T>,
+source
+impl<T> ToOwned for T
+where
+    T: Clone,
+source
+impl<T, U> TryFrom<U> for T
+where
+    U: Into<T>,
+source
+impl<T, U> TryInto<U> for T
+where
+    U: TryFrom<T>,
+source
+impl<T> WithSubscriber for T
+
+Struct leptos_server::SubmissionCopy item path
+source · [−]
+pub struct Submission<I, O>
+where
+    I: 'static,
+    O: 'static,
+{
+    pub input: RwSignal<Option<I>>,
+    pub value: RwSignal<Option<O>>,
+    pub canceled: RwSignal<bool>,
+    /* private fields */
+}
+An action that has been submitted by dispatching it to a MultiAction.
+
+Fields
+input: RwSignal<Option<I>>
+The current argument that was dispatched to the async function. Some while we are waiting for it to resolve, None if it has resolved.
+
+value: RwSignal<Option<O>>
+The most recent return value of the async function.
+
+canceled: RwSignal<bool>
+Controls this submission has been canceled.
+
+Implementations
+source
+impl<I, O> Submission<I, O>
+where
+    I: 'static,
+    O: 'static,
+source
+pub fn pending(&self) -> ReadSignal<bool>
+Whether this submission is currently waiting to resolve.
+
+source
+pub fn cancel(&self)
+Cancels the submission, preventing it from resolving.
+
+Trait Implementations
+source
+impl<I, O> Clone for Submission<I, O>
+source
+fn clone(&self) -> Self
+Returns a copy of the value. Read more
+1.0.0 · source
+fn clone_from(&mut self, source: &Self)
+Performs copy-assignment from source. Read more
+source
+impl<I, O> Copy for Submission<I, O>
+Auto Trait Implementations
+impl<I, O> Freeze for Submission<I, O>
+impl<I, O> RefUnwindSafe for Submission<I, O>
+where
+    I: RefUnwindSafe,
+    O: RefUnwindSafe,
+impl<I, O> Send for Submission<I, O>
+where
+    I: Send,
+    O: Send,
+impl<I, O> Sync for Submission<I, O>
+where
+    I: Sync,
+    O: Sync,
+impl<I, O> Unpin for Submission<I, O>
+where
+    I: Unpin,
+    O: Unpin,
+impl<I, O> UnwindSafe for Submission<I, O>
+where
+    I: UnwindSafe,
+    O: UnwindSafe,
+Blanket Implementations
+source
+impl<T> Any for T
+where
+    T: 'static + ?Sized,
+source
+impl<T> Borrow<T> for T
+where
+    T: ?Sized,
+source
+impl<T> BorrowMut<T> for T
+where
+    T: ?Sized,
+source
+impl<T> From<T> for T
+source
+impl<T> Instrument for T
+source
+impl<T, U> Into<U> for T
+where
+    U: From<T>,
+source
+impl<T> ToOwned for T
+where
+    T: Clone,
+source
+impl<T, U> TryFrom<U> for T
+where
+    U: Into<T>,
+source
+impl<T, U> TryInto<U> for T
+where
+    U: TryFrom<T>,
+source
+impl<T> WithSubscribe

@@ -1,0 +1,292 @@
+WASM error handling in the browser. That basic setup is enough to get you started developing with Leptos.
+
+If you'd prefer to get started using a more full-featured template which demonstrates how to set up a few of the basics you'd see in a real Leptos project, such as routing, (covered later in the book), injecting <Title> and <Meta> tags into the page head, and a few other niceties, then feel free to utilize the leptos-rs start-trunk template repo to get up and running.
+
+The start-trunk template requires that you have Trunk and cargo-generate installed, which you can get by running cargo install trunk and cargo install cargo-generate.
+
+To use the template to set up your project, just run
+
+cargo generate --git https://github.com/leptos-community/start-csr
+
+then run
+
+trunk serve --port 3000 --open
+
+in the newly created app's directory to start developing your app. The Trunk server will reload your app on file changes, making development relatively seamless.
+
+
+A Basic Component
+That “Hello, world!” was a very simple example. Let’s move on to something a little more like an ordinary app.
+
+First, let’s edit the main function so that, instead of rendering the whole app, it just renders an <App/> component. Components are the basic unit of composition and design in most web frameworks, and Leptos is no exception. Conceptually, they are similar to HTML elements: they represent a section of the DOM, with self-contained, defined behavior. Unlike HTML elements, they are in PascalCase, so most Leptos applications will start with something like an <App/> component.
+
+fn main() {
+    leptos::mount_to_body(|| view! { <App/> })
+}
+Now let’s define our <App/> component itself. Because it’s relatively simple, I’ll give you the whole thing up front, then walk through it line by line.
+
+#[component]
+fn App() -> impl IntoView {
+    let (count, set_count) = create_signal(0);
+
+    view! {
+        <button
+            on:click=move |_| {
+                // on stable, this is set_count.set(3);
+                set_count(3);
+            }
+        >
+            "Click me: "
+            // on stable, this is move || count.get();
+            {move || count()}
+        </button>
+    }
+}
+The Component Signature
+#[component]
+Like all component definitions, this begins with the #[component] macro. #[component] annotates a function so it can be used as a component in your Leptos application. We’ll see some of the other features of this macro in a couple chapters.
+
+fn App() -> impl IntoView
+Every component is a function with the following characteristics
+
+It takes zero or more arguments of any type.
+It returns impl IntoView, which is an opaque type that includes anything you could return from a Leptos view.
+Component function arguments are gathered together into a single props struct which is built by the view macro as needed.
+
+The Component Body
+The body of the component function is a set-up function that runs once, not a render function that reruns multiple times. You’ll typically use it to create a few reactive variables, define any side effects that run in response to those values changing, and describe the user interface.
+
+let (count, set_count) = create_signal(0);
+create_signal creates a signal, the basic unit of reactive change and state management in Leptos. This returns a (getter, setter) tuple. To access the current value, you’ll use count.get() (or, on nightly Rust, the shorthand count()). To set the current value, you’ll call set_count.set(...) (or set_count(...)).
+
+.get() clones the value and .set() overwrites it. In many cases, it’s more efficient to use .with() or .update(); check out the docs for ReadSignal and WriteSignal if you’d like to learn more about those trade-offs at this point.
+
+The View
+Leptos defines user interfaces using a JSX-like format via the view macro.
+
+view! {
+    <button
+        // define an event listener with on:
+        on:click=move |_| {
+            set_count(3);
+        }
+    >
+        // text nodes are wrapped in quotation marks
+        "Click me: "
+        // blocks can include Rust code
+        {move || count()}
+    </button>
+}
+This should mostly be easy to understand: it looks like HTML, with a special on:click to define a click event listener, a text node that’s formatted like a Rust string, and then...
+
+{move || count()}
+whatever that is.
+
+People sometimes joke that they use more closures in their first Leptos application than they’ve ever used in their lives. And fair enough. Basically, passing a function into the view tells the framework: “Hey, this is something that might change.”
+
+When we click the button and call set_count, the count signal is updated. This move || count() closure, whose value depends on the value of count, reruns, and the framework makes a targeted update to that one specific text node, touching nothing else in your application. This is what allows for extremely efficient updates to the DOM.
+
+Now, if you have Clippy on—or if you have a particularly sharp eye—you might notice that this closure is redundant, at least if you’re in nightly Rust. If you’re using Leptos with nightly Rust, signals are already functions, so the closure is unnecessary. As a result, you can write a simpler view:
+
+view! {
+    <button /* ... */>
+        "Click me: "
+        // identical to {move || count()}
+        {count}
+    </button>
+}
+Remember—and this is very important—only functions are reactive. This means that {count} and {count()} do very different things in your view. {count} passes in a function, telling the framework to update the view every time count changes. {count()} accesses the value of count once, and passes an i32 into the view, rendering it once, unreactively. You can see the difference in the CodeSandbox below!
+
+Let’s make one final change. set_count(3) is a pretty useless thing for a click handler to do. Let’s replace “set this value to 3” with “increment this value by 1”:
+
+move |_| {
+    set_count.update(|n| *n += 1);
+}
+You can see here that while set_count just sets the value, set_count.update() gives us a mutable reference and mutates the value in place. Either one will trigger a reactive update in our UI.
+
+Throughout this tutorial, we’ll use CodeSandbox to show interactive examples. To show the browser in the sandbox, you may need to click Add DevTools > Other Previews > 8080. Hover over any of the variables to show Rust-Analyzer details and docs for what’s going on. Feel free to fork the examples to play with them yourself!
+
+
+view: Dynamic Classes, Styles and Attributes
+So far we’ve seen how to use the view macro to create event listeners and to create dynamic text by passing a function (such as a signal) into the view.
+
+But of course there are other things you might want to update in your user interface. In this section, we’ll look at how to update classes, styles and attributes dynamically, and we’ll introduce the concept of a derived signal.
+
+Let’s start with a simple component that should be familiar: click a button to increment a counter.
+
+#[component]
+fn App() -> impl IntoView {
+    let (count, set_count) = create_signal(0);
+
+    view! {
+        <button
+            on:click=move |_| {
+                set_count.update(|n| *n += 1);
+            }
+        >
+            "Click me: "
+            {move || count()}
+        </button>
+    }
+}
+So far, this is just the example from the last chapter.
+
+Dynamic Classes
+Now let’s say I’d like to update the list of CSS classes on this element dynamically. For example, let’s say I want to add the class red when the count is odd. I can do this using the class: syntax.
+
+class:red=move || count() % 2 == 1
+class: attributes take
+
+the class name, following the colon (red)
+a value, which can be a bool or a function that returns a bool
+When the value is true, the class is added. When the value is false, the class is removed. And if the value is a function that accesses a signal, the class will reactively update when the signal changes.
+
+Now every time I click the button, the text should toggle between red and black as the number switches between even and odd.
+
+<button
+    on:click=move |_| {
+        set_count.update(|n| *n += 1);
+    }
+    // the class: syntax reactively updates a single class
+    // here, we'll set the `red` class when `count` is odd
+    class:red=move || count() % 2 == 1
+>
+    "Click me"
+</button>
+If you’re following along, make sure you go into your index.html and add something like this:
+
+<style>
+  .red {
+    color: red;
+  }
+</style>
+Some CSS class names can’t be directly parsed by the view macro, especially if they include a mix of dashes and numbers or other characters. In that case, you can use a tuple syntax: class=("name", value) still directly updates a single class.
+
+class=("button-20", move || count() % 2 == 1)
+Dynamic Styles
+Individual CSS properties can be directly updated with a similar style: syntax.
+
+    let (x, set_x) = create_signal(0);
+        view! {
+            <button
+                on:click={move |_| {
+                    set_x.update(|n| *n += 10);
+                }}
+                // set the `style` attribute
+                style="position: absolute"
+                // and toggle individual CSS properties with `style:`
+                style:left=move || format!("{}px", x() + 100)
+                style:background-color=move || format!("rgb({}, {}, 100)", x(), 100)
+                style:max-width="400px"
+                // Set a CSS variable for stylesheet use
+                style=("--columns", x)
+            >
+                "Click to Move"
+            </button>
+    }
+Dynamic Attributes
+The same applies to plain attributes. Passing a plain string or primitive value to an attribute gives it a static value. Passing a function (including a signal) to an attribute causes it to update its value reactively. Let’s add another element to our view:
+
+<progress
+    max="50"
+    // signals are functions, so `value=count` and `value=move || count.get()`
+    // are interchangeable.
+    value=count
+/>
+Now every time we set the count, not only will the class of the <button> be toggled, but the value of the <progress> bar will increase, which means that our progress bar will move forward.
+
+Derived Signals
+Let’s go one layer deeper, just for fun.
+
+You already know that we create reactive interfaces just by passing functions into the view. This means that we can easily change our progress bar. For example, suppose we want it to move twice as fast:
+
+<progress
+    max="50"
+    value=move || count() * 2
+/>
+But imagine we want to reuse that calculation in more than one place. You can do this using a derived signal: a closure that accesses a signal.
+
+let double_count = move || count() * 2;
+
+/* insert the rest of the view */
+<progress
+    max="50"
+    // we use it once here
+    value=double_count
+/>
+<p>
+    "Double Count: "
+    // and again here
+    {double_count}
+</p>
+Derived signals let you create reactive computed values that can be used in multiple places in your application with minimal overhead.
+
+Note: Using a derived signal like this means that the calculation runs once per signal change (when count() changes) and once per place we access double_count; in other words, twice. This is a very cheap calculation, so that’s fine. We’ll look at memos in a later chapter, which were designed to solve this problem for expensive calculations.
+
+Advanced Topic: Injecting Raw HTML
+The view macro provides support for an additional attribute, inner_html, which can be used to directly set the HTML contents of any element, wiping out any other children you’ve given it. Note that this does not escape the HTML you provide. You should make sure that it only contains trusted input or that any HTML entities are escaped, to prevent cross-site scripting (XSS) attacks.
+
+let html = "<p>This HTML will be injected.</p>";
+view! {
+  <div inner_html=html/>
+}
+
+full view macros docs
+
+Macro leptos::viewCopy item path
+source · [−]
+view!() { /* proc-macro */ }
+The view macro uses RSX (like JSX, but Rust!) It follows most of the same rules as HTML, with the following differences:
+
+Text content should be provided as a Rust string, i.e., double-quoted:
+view! { <p>"Here’s some text"</p> };
+Self-closing tags need an explicit / as in XML/XHTML
+ⓘ
+// ❌ not like this
+view! { <input type="text" name="name"> }
+// ✅ add that slash
+view! { <input type="text" name="name" /> }
+Components (functions annotated with #[component]) can be inserted as camel-cased tags. (Generics on components are specified as <Component<T>/>, not the turbofish <Component::<T>/>.)
+view! { <div><Counter initial_value=3 /></div> }
+Dynamic content can be wrapped in curly braces ({ }) to insert text nodes, elements, or set attributes. If you insert a signal here, Leptos will create an effect to update the DOM whenever the value changes. (“Signal” here means Fn() -> T where T is the appropriate type for that node: a String in case of text nodes, a bool for class: attributes, etc.)
+
+Attributes can take a wide variety of primitive types that can be converted to strings. They can also take an Option, in which case Some sets the attribute and None removes the attribute.
+
+ⓘ
+let (count, set_count) = create_signal(0);
+
+view! {
+  // ❌ not like this: `count.get()` returns an `i32`, not a function
+  <p>{count.get()}</p>
+  // ✅ this is good: Leptos sees the function and knows it's a dynamic value
+  <p>{move || count.get()}</p>
+  // 🔥 with the `nightly` feature, `count` is a function, so `count` itself can be passed directly into the view
+  <p>{count}</p>
+}
+Event handlers can be added with on: attributes. In most cases, the events are given the correct type based on the event name.
+view! {
+  <button on:click=|ev| {
+    log::debug!("click event: {ev:#?}");
+  }>
+    "Click me"
+  </button>
+}
+DOM properties can be set with prop: attributes, which take any primitive type or JsValue (or a signal that returns a primitive or JsValue). They can also take an Option, in which case Some sets the property and None deletes the property.
+let (name, set_name) = create_signal("Alice".to_string());
+
+view! {
+  <input
+    type="text"
+    name="user_name"
+    value={move || name.get()} // this only sets the default value!
+    prop:value={move || name.get()} // here's how you update values. Sorry, I didn’t invent the DOM.
+    on:click=move |ev| set_name.set(event_target_value(&ev)) // `event_target_value` is a useful little Leptos helper
+  />
+}
+Classes can be toggled with class: attributes, which take a bool (or a signal that returns a bool).
+let (count, set_count) = create_signal(2);
+view! { <div class:hidden-div={move || count.get() < 3}>"Now you see me, now you don’t."</div> }
+Class names can include dashes, and since v0.5.0 can include a dash-separated segment of only numbers.
+
+let (count, set_count) = create_signal(2);
+view! { <div class:hidden-div-25={move || count.g

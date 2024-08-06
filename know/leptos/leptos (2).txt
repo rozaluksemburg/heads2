@@ -1,0 +1,410 @@
+et() < 3}>"Now you see me, now you don’t."</div> }
+Class names cannot include special symbols.
+
+ⓘ
+let (count, set_count) = create_signal(2);
+// class:hidden-[div]-25 is invalid attribute name
+view! { <div class:hidden-[div]-25={move || count.get() < 3}>"Now you see me, now you don’t."</div> }
+However, you can pass arbitrary class names using the syntax class=("name", value).
+
+let (count, set_count) = create_signal(2);
+// this allows you to use CSS frameworks that include complex class names
+view! {
+  <div
+    class=("is-[this_-_really]-necessary-42", move || count.get() < 3)
+  >
+    "Now you see me, now you don’t."
+  </div>
+}
+Individual styles can also be set with style: or style=("property-name", value) syntax.
+let (x, set_x) = create_signal(0);
+let (y, set_y) = create_signal(0);
+view! {
+  <div
+    style="position: absolute"
+    style:left=move || format!("{}px", x.get())
+    style:top=move || format!("{}px", y.get())
+    style=("background-color", move || format!("rgb({}, {}, 100)", x.get(), y.get()))
+  >
+    "Moves when coordinates change"
+  </div>
+}
+You can use the node_ref or _ref attribute to store a reference to its DOM element in a NodeRef to use later.
+use leptos::html::Input;
+
+let (value, set_value) = create_signal(0);
+let my_input = create_node_ref::<Input>();
+view! { <input type="text" _ref=my_input/> }
+// `my_input` now contains an `Element` that we can use anywhere
+You can add the same class to every element in the view by passing in a special class = {/* ... */}, argument after ``. This is useful for injecting a class provided by a scoped styling library.
+let class = "mycustomclass";
+view! { class = class,
+  <div> // will have class="mycustomclass"
+    <p>"Some text"</p> // will also have class "mycustomclass"
+  </div>
+}
+You can set any HTML element’s innerHTML with the inner_html attribute on an element. Be careful: this HTML will not be escaped, so you should ensure that it only contains trusted input.
+let html = "<p>This HTML will be injected.</p>";
+view! {
+  <div inner_html=html/>
+}
+Here’s a simple example that shows off several of these features, put together
+
+
+pub fn SimpleCounter() -> impl IntoView {
+    // create a reactive signal with the initial value
+    let (value, set_value) = create_signal(0);
+
+    // create event handlers for our buttons
+    // note that `value` and `set_value` are `Copy`, so it's super easy to move them into closures
+    let clear = move |_ev| set_value.set(0);
+    let decrement = move |_ev| set_value.update(|value| *value -= 1);
+    let increment = move |_ev| set_value.update(|value| *value += 1);
+
+    view! {
+        <div>
+            <button on:click=clear>"Clear"</button>
+            <button on:click=decrement>"-1"</button>
+            <span>"Value: " {move || value.get().to_string()} "!"</span>
+            <button on:click=increment>"+1"</button>
+        </div>
+    }
+}
+
++ one more code
+
+use leptos::*;
+
+#[component]
+fn App() -> impl IntoView {
+    let (count, set_count) = create_signal(0);
+
+    // a "derived signal" is a function that accesses other signals
+    // we can use this to create reactive values that depend on the
+    // values of one or more other signals
+    let double_count = move || count() * 2;
+
+    view! {
+        <button
+            on:click=move |_| {
+                set_count.update(|n| *n += 1);
+            }
+            // the class: syntax reactively updates a single class
+            // here, we'll set the `red` class when `count` is odd
+            class:red=move || count() % 2 == 1
+        >
+            "Click me"
+        </button>
+        // NOTE: self-closing tags like <br> need an explicit /
+        <br/>
+
+        // We'll update this progress bar every time `count` changes
+        <progress
+            // static attributes work as in HTML
+            max="50"
+
+            // passing a function to an attribute
+            // reactively sets that attribute
+            // signals are functions, so `value=count` and `value=move || count.get()`
+            // are interchangeable.
+            value=count
+        >
+        </progress>
+        <br/>
+
+        // This progress bar will use `double_count`
+        // so it should move twice as fast!
+        <progress
+            max="50"
+            // derived signals are functions, so they can also
+            // reactively update the DOM
+            value=double_count
+        >
+        </progress>
+        <p>"Count: " {count}</p>
+        <p>"Double Count: " {double_count}</p>
+    }
+}
+
+fn main() {
+    leptos::mount_to_body(App)
+}
+
+
+
+
+Components and Props
+So far, we’ve been building our whole application in a single component. This is fine for really tiny examples, but in any real application you’ll need to break the user interface out into multiple components, so you can break your interface down into smaller, reusable, composable chunks.
+
+Let’s take our progress bar example. Imagine that you want two progress bars instead of one: one that advances one tick per click, one that advances two ticks per click.
+
+You could do this by just creating two <progress> elements:
+
+let (count, set_count) = create_signal(0);
+let double_count = move || count() * 2;
+
+view! {
+    <progress
+        max="50"
+        value=count
+    />
+    <progress
+        max="50"
+        value=double_count
+    />
+}
+But of course, this doesn’t scale very well. If you want to add a third progress bar, you need to add this code another time. And if you want to edit anything about it, you need to edit it in triplicate.
+
+Instead, let’s create a <ProgressBar/> component.
+
+#[component]
+fn ProgressBar() -> impl IntoView {
+    view! {
+        <progress
+            max="50"
+            // hmm... where will we get this from?
+            value=progress
+        />
+    }
+}
+There’s just one problem: progress is not defined. Where should it come from? When we were defining everything manually, we just used the local variable names. Now we need some way to pass an argument into the component.
+
+Component Props
+We do this using component properties, or “props.” If you’ve used another frontend framework, this is probably a familiar idea. Basically, properties are to components as attributes are to HTML elements: they let you pass additional information into the component.
+
+In Leptos, you define props by giving additional arguments to the component function.
+
+#[component]
+fn ProgressBar(
+    progress: ReadSignal<i32>
+) -> impl IntoView {
+    view! {
+        <progress
+            max="50"
+            // now this works
+            value=progress
+        />
+    }
+}
+Now we can use our component in the main <App/> component’s view.
+
+#[component]
+fn App() -> impl IntoView {
+    let (count, set_count) = create_signal(0);
+    view! {
+        <button on:click=move |_| { set_count.update(|n| *n += 1); }>
+            "Click me"
+        </button>
+        // now we use our component!
+        <ProgressBar progress=count/>
+    }
+}
+Using a component in the view looks a lot like using an HTML element. You’ll notice that you can easily tell the difference between an element and a component because components always have PascalCase names. You pass the progress prop in as if it were an HTML element attribute. Simple.
+
+Reactive and Static Props
+You’ll notice that throughout this example, progress takes a reactive ReadSignal<i32>, and not a plain i32. This is very important.
+
+Component props have no special meaning attached to them. A component is simply a function that runs once to set up the user interface. The only way to tell the interface to respond to changes is to pass it a signal type. So if you have a component property that will change over time, like our progress, it should be a signal.
+
+optional Props
+Right now the max setting is hard-coded. Let’s take that as a prop too. But let’s add a catch: let’s make this prop optional by annotating the particular argument to the component function with #[prop(optional)].
+
+#[component]
+fn ProgressBar(
+    // mark this prop optional
+    // you can specify it or not when you use <ProgressBar/>
+    #[prop(optional)]
+    max: u16,
+    progress: ReadSignal<i32>
+) -> impl IntoView {
+    view! {
+        <progress
+            max=max
+            value=progress
+        />
+    }
+}
+Now, we can use <ProgressBar max=50 progress=count/>, or we can omit max to use the default value (i.e., <ProgressBar progress=count/>). The default value on an optional is its Default::default() value, which for a u16 is going to be 0. In the case of a progress bar, a max value of 0 is not very useful.
+
+So let’s give it a particular default value instead.
+
+default props
+You can specify a default value other than Default::default() pretty simply with #[prop(default = ...).
+
+#[component]
+fn ProgressBar(
+    #[prop(default = 100)]
+    max: u16,
+    progress: ReadSignal<i32>
+) -> impl IntoView {
+    view! {
+        <progress
+            max=max
+            value=progress
+        />
+    }
+}
+Generic Props
+This is great. But we began with two counters, one driven by count, and one by the derived signal double_count. Let’s recreate that by using double_count as the progress prop on another <ProgressBar/>.
+
+#[component]
+fn App() -> impl IntoView {
+    let (count, set_count) = create_signal(0);
+    let double_count = move || count() * 2;
+
+    view! {
+        <button on:click=move |_| { set_count.update(|n| *n += 1); }>
+            "Click me"
+        </button>
+        <ProgressBar progress=count/>
+        // add a second progress bar
+        <ProgressBar progress=double_count/>
+    }
+}
+Hm... this won’t compile. It should be pretty easy to understand why: we’ve declared that the progress prop takes ReadSignal<i32>, and double_count is not ReadSignal<i32>. As rust-analyzer will tell you, its type is || -> i32, i.e., it’s a closure that returns an i32.
+
+There are a couple ways to handle this. One would be to say: “Well, I know that a ReadSignal is a function, and I know that a closure is a function; maybe I could just take any function?” If you’re savvy, you may know that both these implement the trait Fn() -> i32. So you could use a generic component:
+
+#[component]
+fn ProgressBar<F>(
+    #[prop(default = 100)]
+    max: u16,
+    progress: F
+) -> impl IntoView
+where
+    F: Fn() -> i32 + 'static,
+{
+    view! {
+        <progress
+            max=max
+            value=progress
+        />
+    }
+}
+This is a perfectly reasonable way to write this component: progress now takes any value that implements this Fn() trait.
+
+This generic can also be specified inline:
+
+#[component]
+fn ProgressBar<F: Fn() -> i32 + 'static>(
+    #[prop(default = 100)] max: u16,
+    progress: F,
+) -> impl IntoView {
+    view! {
+        <progress
+            max=max
+            value=progress
+        />
+    }
+}
+Note that generic component props can’t be specified with an impl yet (progress: impl Fn() -> i32 + 'static,), in part because they’re actually used to generate a struct ProgressBarProps, and struct fields cannot be impl types. The #[component] macro may be further improved in the future to allow inline impl generic props.
+
+Generics need to be used somewhere in the component props. This is because props are built into a struct, so all generic types must be used somewhere in the struct. This is often easily accomplished using an optional PhantomData prop. You can then specify a generic in the view using the syntax for expressing types: <Component<T>/> (not with the turbofish-style <Component::<T>/>).
+
+#[component]
+fn SizeOf<T: Sized>(#[prop(optional)] _ty: PhantomData<T>) -> impl IntoView {
+    std::mem::size_of::<T>()
+}
+
+#[component]
+pub fn App() -> impl IntoView {
+    view! {
+        <SizeOf<usize>/>
+        <SizeOf<String>/>
+    }
+}
+Note that there are some limitations. For example, our view macro parser can’t handle nested generics like <SizeOf<Vec<T>>/>.
+
+into Props
+There’s one more way we could implement this, and it would be to use #[prop(into)]. This attribute automatically calls .into() on the values you pass as props, which allows you to easily pass props with different values.
+
+In this case, it’s helpful to know about the Signal type. Signal is an enumerated type that represents any kind of readable reactive signal. It can be useful when defining APIs for components you’ll want to reuse while passing different sorts of signals. The MaybeSignal type is useful when you want to be able to take either a static or reactive value.
+
+#[component]
+fn ProgressBar(
+    #[prop(default = 100)]
+    max: u16,
+    #[prop(into)]
+    progress: Signal<i32>
+) -> impl IntoView
+{
+    view! {
+        <progress
+            max=max
+            value=progress
+        />
+    }
+}
+
+#[component]
+fn App() -> impl IntoView {
+    let (count, set_count) = create_signal(0);
+    let double_count = move || count() * 2;
+
+    view! {
+        <button on:click=move |_| { set_count.update(|n| *n += 1); }>
+            "Click me"
+        </button>
+        // .into() converts `ReadSignal` to `Signal`
+        <ProgressBar progress=count/>
+        // use `Signal::derive()` to wrap a derived signal
+        <ProgressBar progress=Signal::derive(double_count)/>
+    }
+}
+Optional Generic Props
+Note that you can’t specify optional generic props for a component. Let’s see what would happen if you try:
+
+#[component]
+fn ProgressBar<F: Fn() -> i32 + 'static>(
+    #[prop(optional)] progress: Option<F>,
+) -> impl IntoView {
+    progress.map(|progress| {
+        view! {
+            <progress
+                max=100
+                value=progress
+            />
+        }
+    })
+}
+
+#[component]
+pub fn App() -> impl IntoView {
+    view! {
+        <ProgressBar/>
+    }
+}
+Rust helpfully gives the error
+
+xx |         <ProgressBar/>
+   |          ^^^^^^^^^^^ cannot infer type of the type parameter `F` declared on the function `ProgressBar`
+   |
+help: consider specifying the generic argument
+   |
+xx |         <ProgressBar::<F>/>
+   |                     +++++
+You can specify generics on components with a <ProgressBar<F>/> syntax (no turbofish in the view macro). Specifying the correct type here is not possible; closures and functions in general are unnameable types. The compiler can display them with a shorthand, but you can’t specify them.
+
+However, you can get around this by providing a concrete type using Box<dyn _> or &dyn _:
+
+#[component]
+fn ProgressBar(
+    #[prop(optional)] progress: Option<Box<dyn Fn() -> i32>>,
+) -> impl IntoView {
+    progress.map(|progress| {
+        view! {
+            <progress
+                max=100
+                value=progress
+            />
+        }
+    })
+}
+
+#[component]
+pub fn App() -> impl IntoView {
+    view! {
+        <ProgressBar/>
+    }
+}
+Because the Rust compiler now knows the concrete type of the prop, and therefore its size in memory even in the None case, this compiles fine

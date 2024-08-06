@@ -1,0 +1,211 @@
+to send chunks of data one after another without waiting for the full content to load. You may not realize that browsers are also really good at rendering partial HTML pages. Taken together, this means that you can actually enhance your users’ experience by streaming HTML: and this is something that Leptos supports out of the box, with no configuration at all. And there’s actually more than one way to stream HTML: you can stream the chunks of HTML that make up your page in order, like frames of a video, or you can stream them... well, out of order.
+
+Let me say a little more about what I mean.
+
+Leptos supports all the major ways of rendering HTML that includes asynchronous data:
+
+Synchronous Rendering
+Async Rendering
+In-Order streaming
+Out-of-Order Streaming (and a partially-blocked variant)
+Synchronous Rendering
+Synchronous: Serve an HTML shell that includes fallback for any <Suspense/>. Load data on the client using create_local_resource, replacing fallback once resources are loaded.
+Pros: App shell appears very quickly: great TTFB (time to first byte).
+Cons
+Resources load relatively slowly; you need to wait for JS + WASM to load before even making a request.
+No ability to include data from async resources in the <title> or other <meta> tags, hurting SEO and things like social media link previews.
+If you’re using server-side rendering, the synchronous mode is almost never what you actually want, from a performance perspective. This is because it misses out on an important optimization. If you’re loading async resources during server rendering, you can actually begin loading the data on the server. Rather than waiting for the client to receive the HTML response, then loading its JS + WASM, then realize it needs the resources and begin loading them, server rendering can actually begin loading the resources when the client first makes the response. In this sense, during server rendering an async resource is like a Future that begins loading on the server and resolves on the client. As long as the resources are actually serializable, this will always lead to a faster total load time.
+
+This is why create_resource requires resources data to be serializable by default, and why you need to explicitly use create_local_resource for any async data that is not serializable and should therefore only be loaded in the browser itself. Creating a local resource when you could create a serializable resource is always a deoptimization.
+
+Async Rendering
+async: Load all resources on the server. Wait until all data are loaded, and render HTML in one sweep.
+Pros: Better handling for meta tags (because you know async data even before you render the <head>). Faster complete load than synchronous because async resources begin loading on server.
+Cons: Slower load time/TTFB: you need to wait for all async resources to load before displaying anything on the client. The page is totally blank until everything is loaded.
+In-Order Streaming
+In-order streaming: Walk through the component tree, rendering HTML until you hit a <Suspense/>. Send down all the HTML you’ve got so far as a chunk in the stream, wait for all the resources accessed under the <Suspense/> to load, then render it to HTML and keep walking until you hit another <Suspense/> or the end of the page.
+Pros: Rather than a blank screen, shows at least something before the data are ready.
+Cons
+Loads the shell more slowly than synchronous rendering (or out-of-order streaming) because it needs to pause at every <Suspense/>.
+Unable to show fallback states for <Suspense/>.
+Can’t begin hydration until the entire page has loaded, so earlier pieces of the page will not be interactive until the suspended chunks have loaded.
+Out-of-Order Streaming
+Out-of-order streaming: Like synchronous rendering, serve an HTML shell that includes fallback for any <Suspense/>. But load data on the server, streaming it down to the client as it resolves, and streaming down HTML for <Suspense/> nodes, which is swapped in to replace the fallback.
+Pros: Combines the best of synchronous and async.
+Fast initial response/TTFB because it immediately sends the whole synchronous shell
+Fast total time because resources begin loading on the server.
+Able to show the fallback loading state and dynamically replace it, instead of showing blank sections for un-loaded data.
+Cons: Requires JavaScript to be enabled for suspended fragments to appear in correct order. (This small chunk of JS streamed down in a <script> tag alongside the <template> tag that contains the rendered <Suspense/> fragment, so it does not need to load any additional JS files.)
+Partially-blocked streaming: “Partially-blocked” streaming is useful when you have multiple separate <Suspense/> components on the page. It is triggered by setting ssr=SsrMode::PartiallyBlocked on a route, and depending on blocking resources within the view. If one of the <Suspense/> components reads from one or more “blocking resources” (see below), the fallback will not be sent; rather, the server will wait until that <Suspense/> has resolved and then replace the fallback with the resolved fragment on the server, which means that it is included in the initial HTML response and appears even if JavaScript is disabled or not supported. Other <Suspense/> stream in out of order, similar to the SsrMode::OutOfOrder default.
+This is useful when you have multiple <Suspense/> on the page, and one is more important than the other: think of a blog post and comments, or product information and reviews. It is not useful if there’s only one <Suspense/>, or if every <Suspense/> reads from blocking resources. In those cases it is a slower form of async rendering.
+
+Pros: Works if JavaScript is disabled or not supported on the user’s device.
+Cons
+Slower initial response time than out-of-order.
+Marginally overall response due to additional work on the server.
+No fallback state shown.
+Using SSR Modes
+Because it offers the best blend of performance characteristics, Leptos defaults to out-of-order streaming. But it’s really simple to opt into these different modes. You do it by adding an ssr property onto one or more of your <Route/> components, like in the ssr_modes example.
+
+<Routes>
+    // We’ll load the home page with out-of-order streaming and <Suspense/>
+    <Route path="" view=HomePage/>
+
+    // We'll load the posts with async rendering, so they can set
+    // the title and metadata *after* loading the data
+    <Route
+        path="/post/:id"
+        view=Post
+        ssr=SsrMode::Async
+    />
+</Routes>
+For a path that includes multiple nested routes, the most restrictive mode will be used: i.e., if even a single nested route asks for async rendering, the whole initial request will be rendered async. async is the most restricted requirement, followed by in-order, and then out-of-order. (This probably makes sense if you think about it for a few minutes.)
+
+Blocking Resources
+Any Leptos versions later than 0.2.5 (i.e., git main and 0.3.x or later) introduce a new resource primitive with create_blocking_resource. A blocking resource still loads asynchronously like any other async/.await in Rust; it doesn’t block a server thread or anything. Instead, reading from a blocking resource under a <Suspense/> blocks the HTML stream from returning anything, including its initial synchronous shell, until that <Suspense/> has resolved.
+
+Now from a performance perspective, this is not ideal. None of the synchronous shell for your page will load until that resource is ready. However, rendering nothing means that you can do things like set the <title> or <meta> tags in your <head> in actual HTML. This sounds a lot like async rendering, but there’s one big difference: if you have multiple <Suspense/> sections, you can block on one of them but still render a placeholder and then stream in the other.
+
+For example, think about a blog post. For SEO and for social sharing, I definitely want my blog post’s title and metadata in the initial HTML <head>. But I really don’t care whether comments have loaded yet or not; I’d like to load those as lazily as possible.
+
+With blocking resources, I can do something like this:
+
+#[component]
+pub fn BlogPost() -> impl IntoView {
+    let post_data = create_blocking_resource(/* load blog post */);
+    let comments_data = create_resource(/* load blog comments */);
+    view! {
+        <Suspense fallback=|| ()>
+            {move || {
+                post_data.with(|data| {
+                    view! {
+                        <Title text=data.title/>
+                        <Meta name="description" content=data.excerpt/>
+                        <article>
+                            /* render the post content */
+                        </article>
+                    }
+                })
+            }}
+        </Suspense>
+        <Suspense fallback=|| "Loading comments...">
+            /* render comments data here */
+        </Suspense>
+    }
+}
+The first <Suspense/>, with the body of the blog post, will block my HTML stream, because it reads from a blocking resource. Meta tags and other head elements awaiting the blocking resource will be rendered before the stream is sent.
+
+Combined with the following route definition, which uses SsrMode::PartiallyBlocked, the blocking resource will be fully rendered on the server side, making it accessible to users who disable WebAssembly or JavaScript.
+
+<Routes>
+    // We’ll load the home page with out-of-order streaming and <Suspense/>
+    <Route path="" view=HomePage/>
+
+    // We'll load the posts with async rendering, so they can set
+    // the title and metadata *after* loading the data
+    <Route
+        path="/post/:id"
+        view=Post
+        ssr=SsrMode::PartiallyBlocked
+    />
+</Routes>
+The second <Suspense/>, with the comments, will not block the stream. Blocking resources gave me exactly the power and granularity I needed to optimize my page for SEO and user experience.
+
+
+Where do you expect where do I run? to log?
+
+In the command line where you’re running the server?
+In the browser console when you load the page?
+Neither?
+Both?
+Try it out.
+
+...
+
+...
+
+...
+
+Okay, consider the spoiler alerted.
+
+You’ll notice of course that it logs in both places, assuming everything goes according to plan. In fact on the server it logs twice—first during the initial server startup, when Leptos renders your app once to extract the route tree, then a second time when you make a request. Each time you reload the page, where do I run? should log once on the server and once on the client.
+
+If you think about the description in the last couple sections, hopefully this makes sense. Your application runs once on the server, where it builds up a tree of HTML which is sent to the client. During this initial render, where do I run? logs on the server.
+
+Once the WASM binary has loaded in the browser, your application runs a second time, walking over the same user interface tree and adding interactivity.
+
+Does that sound like a waste? It is, in a sense. But reducing that waste is a genuinely hard problem. It’s what some JS frameworks like Qwik are intended to solve, although it’s probably too early to tell whether it’s a net performance gain as opposed to other approaches.
+
+The Potential for Bugs
+Okay, hopefully all of that made sense. But what does it have to do with the title of this chapter, which is “Hydration bugs (and how to avoid them)”?
+
+Remember that the application needs to run on both the server and the client. This generates a few different sets of potential issues you need to know how to avoid.
+
+Mismatches between server and client code
+One way to create a bug is by creating a mismatch between the HTML that’s sent down by the server and what’s rendered on the client. It’s actually fairly hard to do this unintentionally, I think (at least judging by the bug reports I get from people.) But imagine I do something like this
+
+#[component]
+pub fn App() -> impl IntoView {
+    let data = if cfg!(target_arch = "wasm32") {
+        vec![0, 1, 2]
+    } else {
+        vec![]
+    };
+    data.into_iter()
+        .map(|value| view! { <span>{value}</span> })
+        .collect_view()
+}
+In other words, if this is being compiled to WASM, it has three items; otherwise it’s empty.
+
+When I load the page in the browser, I see nothing. If I open the console I see a bunch of warnings:
+
+element with id 0-3 not found, ignoring it for hydration
+element with id 0-4 not found, ignoring it for hydration
+element with id 0-5 not found, ignoring it for hydration
+component with id _0-6c not found, ignoring it for hydration
+component with id _0-6o not found, ignoring it for hydration
+The WASM version of your app, running in the browser, expects to find three items; but the HTML has none.
+
+Solution
+It’s pretty rare that you do this intentionally, but it could happen from somehow running different logic on the server and in the browser. If you’re seeing warnings like this and you don’t think it’s your fault, it’s much more likely that it’s a bug with <Suspense/> or something. Feel free to go ahead and open an issue or discussion on GitHub for help.
+
+Not all client code can run on the server
+Imagine you happily import a dependency like gloo-net that you’ve been used to using to make requests in the browser, and use it in a create_resource in a server-rendered app.
+
+You’ll probably instantly see the dreaded message
+
+panicked at 'cannot call wasm-bindgen imported functions on non-wasm targets'
+Uh-oh.
+
+But of course this makes sense. We’ve just said that your app needs to run on the client and the server.
+
+Solution
+There are a few ways to avoid this:
+
+Only use libraries that can run on both the server and the client. reqwest, for example, works for making HTTP requests in both settings.
+Use different libraries on the server and the client, and gate them using the #[cfg] macro. (Click here for an example.)
+Wrap client-only code in create_effect. Because create_effect only runs on the client, this can be an effective way to access browser APIs that are not needed for initial rendering.
+For example, say that I want to store something in the browser’s localStorage whenever a signal changes.
+
+#[component]
+pub fn App() -> impl IntoView {
+    use gloo_storage::Storage;
+    let storage = gloo_storage::LocalStorage::raw();
+    logging::log!("{storage:?}");
+}
+This panics because I can’t access LocalStorage during server rendering.
+
+But if I wrap it in an effect...
+
+#[component]
+pub fn App() -> impl IntoView {
+    use gloo_storage::Storage;
+    create_effect(move |_| {
+        let storage = gloo_storage::LocalStorage::raw();
+        logging::log!("{storage:?}");
+    });
+}
+It’s fine! This will render appropriately on the server, ignoring the client-only code, and then access the storage and log a message on the browser.
+
+Not all server code can run on the client
+WebAssembly running in the browser is a pretty limited environment. You don’t have access to a file-syste

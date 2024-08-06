@@ -1,0 +1,278 @@
+ rows
+    let (data, set_data) = create_signal(vec![
+        DatabaseEntry {
+            key: "foo".to_string(),
+            value: 10,
+        },
+        DatabaseEntry {
+            key: "bar".to_string(),
+            value: 20,
+        },
+        DatabaseEntry {
+            key: "baz".to_string(),
+            value: 15,
+        },
+    ]);
+    view! {
+        // when we click, update each row,
+        // doubling its value
+        <button on:click=move |_| {
+            set_data.update(|data| {
+                for row in data {
+                    row.value *= 2;
+                }
+            });
+            // log the new value of the signal
+            logging::log!("{:?}", data.get());
+        }>
+            "Update Values"
+        </button>
+        // iterate over the rows and display each value
+        <For
+            each=data
+            key=|state| state.key.clone()
+            let:child
+        >
+            <p>{child.value}</p>
+        </For>
+    }
+}
+Note the let:child syntax here. In the previous chapter we introduced <For/> with a children prop. We can actually create this value directly in the children of the <For/> component, without breaking out of the view macro: the let:child combined with <p>{child.value}</p> above is the equivalent of
+
+children=|child| view! { <p>{child.value}</p> }
+When you click the Update Values button... nothing happens. Or rather: the signal is updated, the new value is logged, but the {child.value} for each row doesn’t update.
+
+Let’s see: is that because we forgot to add a closure to make it reactive? Let’s try {move || child.value}.
+
+...Nope. Still nothing.
+
+Here’s the problem: as I said, each row is only rerendered when the key changes. We’ve updated the value for each row, but not the key for any of the rows, so nothing has rerendered. And if you look at the type of child.value, it’s a plain i32, not a reactive ReadSignal<i32> or something. This means that even if we wrap a closure around it, the value in this row will never update.
+
+We have three possible solutions:
+
+change the key so that it always updates when the data structure changes
+change the value so that it’s reactive
+take a reactive slice of the data structure instead of using each row directly
+Option 1: Change the Key
+Each row is only rerendered when the key changes. Our rows above didn’t rerender, because the key didn’t change. So: why not just force the key to change?
+
+<For
+    each=data
+    key=|state| (state.key.clone(), state.value)
+    let:child
+>
+    <p>{child.value}</p>
+</For>
+Now we include both the key and the value in the key. This means that whenever the value of a row changes, <For/> will treat it as if it’s an entirely new row, and replace the previous one.
+
+Pros
+This is very easy. We can make it even easier by deriving PartialEq, Eq, and Hash on DatabaseEntry, in which case we could just key=|state| state.clone().
+
+Cons
+This is the least efficient of the three options. Every time the value of a row changes, it throws out the previous <p> element and replaces it with an entirely new one. Rather than making a fine-grained update to the text node, in other words, it really does rerender the entire row on every change, and this is expensive in proportion to how complex the UI of the row is.
+
+You’ll notice we also end up cloning the whole data structure so that <For/> can hold onto a copy of the key. For more complex structures, this can become a bad idea fast!
+
+Option 2: Nested Signals
+If we do want that fine-grained reactivity for the value, one option is to wrap the value of each row in a signal.
+
+#[derive(Debug, Clone)]
+struct DatabaseEntry {
+    key: String,
+    value: RwSignal<i32>,
+}
+RwSignal<_> is a “read-write signal,” which combines the getter and setter in one object. I’m using it here because it’s a little easier to store in a struct than separate getters and setters.
+
+#[component]
+pub fn App() -> impl IntoView {
+    // start with a set of three rows
+    let (data, set_data) = create_signal(vec![
+        DatabaseEntry {
+            key: "foo".to_string(),
+            value: create_rw_signal(10),
+        },
+        DatabaseEntry {
+            key: "bar".to_string(),
+            value: create_rw_signal(20),
+        },
+        DatabaseEntry {
+            key: "baz".to_string(),
+            value: create_rw_signal(15),
+        },
+    ]);
+    view! {
+        // when we click, update each row,
+        // doubling its value
+        <button on:click=move |_| {
+            data.with(|data| {
+                for row in data {
+                    row.value.update(|value| *value *= 2);
+                }
+            });
+            // log the new value of the signal
+            logging::log!("{:?}", data.get());
+        }>
+            "Update Values"
+        </button>
+        // iterate over the rows and display each value
+        <For
+            each=data
+            key=|state| state.key.clone()
+            let:child
+        >
+            <p>{child.value}</p>
+        </For>
+    }
+}
+This version works! And if you look in the DOM inspector in your browser, you’ll see that unlike in the previous version, in this version only the individual text nodes are updated. Passing the signal directly into {child.value} works, as signals do keep their reactivity if you pass them into the view.
+
+Note that I changed the set_data.update() to a data.with(). .with() is the non-cloning way of accessing a signal’s value. In this case, we are only updating the internal values, not updating the list of values: because signals maintain their own state, we don’t actually need to update the data signal at all, so the immutable .with() is fine here.
+
+In fact, this version doesn’t update data, so the <For/> is essentially a static list as in the last chapter, and this could just be a plain iterator. But the <For/> is useful if we want to add or remove rows in the future.
+
+Pros
+This is the most efficient option, and fits directly with the rest of the mental model of the framework: values that change over time are wrapped in signals so the interface can respond to them.
+
+Cons
+Nested reactivity can be cumbersome if you’re receiving data from an API or another data source you don’t control, and you don’t want to create a different struct wrapping each field in a signal.
+
+Option 3: Memoized Slices
+Leptos provides a primitive called create_memo, which creates a derived computation that only triggers a reactive update when its value has changed.
+
+This allows you to create reactive values for subfields of a larger data structure, without needing to wrap the fields of that structure in signals.
+
+Most of the application can remain the same as the initial (broken) version, but the <For/> will be updated to this:
+
+<For
+    each=move || data().into_iter().enumerate()
+    key=|(_, state)| state.key.clone()
+    children=move |(index, _)| {
+        let value = create_memo(move |_| {
+            data.with(|data| data.get(index).map(|d| d.value).unwrap_or(0))
+        });
+        view! {
+            <p>{value}</p>
+        }
+    }
+/>
+You’ll notice a few differences here:
+
+we convert the data signal into an enumerated iterator
+we use the children prop explicitly, to make it easier to run some non-view code
+we define a value memo and use that in the view. This value field doesn’t actually use the child being passed into each row. Instead, it uses the index and reaches back into the original data to get the value.
+Every time data changes, now, each memo will be recalculated. If its value has changed, it will update its text node, without rerendering the whole row.
+
+Pros
+We get the same fine-grained reactivity of the signal-wrapped version, without needing to wrap the data in signals.
+
+Cons
+It’s a bit more complex to set up this memo-per-row inside the <For/> loop rather than using nested signals. For example, you’ll notice that we have to guard against the possibility that the data[index] would panic by using data.get(index), because this memo may be triggered to re-run once just after the row is removed. (This is because the memo for each row and the whole <For/> both depend on the same data signal, and the order of execution for multiple reactive values that depend on the same signal isn’t guaranteed.)
+
+Note also that while memos memoize their reactive changes, the same calculation does need to re-run to check the value every time, so nested reactive signals will still be more efficient for pinpoint updates here.
+
+
+Forms and Inputs
+Forms and form inputs are an important part of interactive apps. There are two basic patterns for interacting with inputs in Leptos, which you may recognize if you’re familiar with React, SolidJS, or a similar framework: using controlled or uncontrolled inputs.
+
+Controlled Inputs
+In a "controlled input," the framework controls the state of the input element. On every input event, it updates a local signal that holds the current state, which in turn updates the value prop of the input.
+
+There are two important things to remember:
+
+The input event fires on (almost) every change to the element, while the change event fires (more or less) when you unfocus the input. You probably want on:input, but we give you the freedom to choose.
+The value attribute only sets the initial value of the input, i.e., it only updates the input up to the point that you begin typing. The value property continues updating the input after that. You usually want to set prop:value for this reason. (The same is true for checked and prop:checked on an <input type="checkbox">.)
+let (name, set_name) = create_signal("Controlled".to_string());
+
+view! {
+    <input type="text"
+        on:input=move |ev| {
+            // event_target_value is a Leptos helper function
+            // it functions the same way as event.target.value
+            // in JavaScript, but smooths out some of the typecasting
+            // necessary to make this work in Rust
+            set_name(event_target_value(&ev));
+        }
+
+        // the `prop:` syntax lets you update a DOM property,
+        // rather than an attribute.
+        prop:value=name
+    />
+    <p>"Name is: " {name}</p>
+}
+Why do you need prop:value?
+Web browsers are the most ubiquitous and stable platform for rendering graphical user interfaces in existence. They have also maintained an incredible backwards compatibility over their three decades of existence. Inevitably, this means there are some quirks.
+
+One odd quirk is that there is a distinction between HTML attributes and DOM element properties, i.e., between something called an “attribute” which is parsed from HTML and can be set on a DOM element with .setAttribute(), and something called a “property” which is a field of the JavaScript class representation of that parsed HTML element.
+
+In the case of an <input value=...>, setting the value attribute is defined as setting the initial value for the input, and setting value property sets its current value. It maybe easiest to understand this by opening about:blank and running the following JavaScript in the browser console, line by line:
+
+// create an input and append it to the DOM
+const el = document.createElement("input");
+document.body.appendChild(el);
+
+el.setAttribute("value", "test"); // updates the input
+el.setAttribute("value", "another test"); // updates the input again
+
+// now go and type into the input: delete some characters, etc.
+
+el.setAttribute("value", "one more time?");
+// nothing should have changed. setting the "initial value" does nothing now
+
+// however...
+el.value = "But this works";
+Many other frontend frameworks conflate attributes and properties, or create a special case for inputs that sets the value correctly. Maybe Leptos should do this too; but for now, I prefer giving users the maximum amount of control over whether they’re setting an attribute or a property, and doing my best to educate people about the actual underlying browser behavior rather than obscuring it.
+
+Uncontrolled Inputs
+In an "uncontrolled input," the browser controls the state of the input element. Rather than continuously updating a signal to hold its value, we use a NodeRef to access the input when we want to get its value.
+
+In this example, we only notify the framework when the <form> fires a submit event. Note the use of the leptos::html module, which provides a bunch of types for every HTML element.
+
+let (name, set_name) = create_signal("Uncontrolled".to_string());
+
+let input_element: NodeRef<html::Input> = create_node_ref();
+
+view! {
+    <form on:submit=on_submit> // on_submit defined below
+        <input type="text"
+            value=name
+            node_ref=input_element
+        />
+        <input type="submit" value="Submit"/>
+    </form>
+    <p>"Name is: " {name}</p>
+}
+The view should be pretty self-explanatory by now. Note two things:
+
+Unlike in the controlled input example, we use value (not prop:value). This is because we’re just setting the initial value of the input, and letting the browser control its state. (We could use prop:value instead.)
+We use node_ref=... to fill the NodeRef. (Older examples sometimes use _ref. They are the same thing, but node_ref has better rust-analyzer support.)
+NodeRef is a kind of reactive smart pointer: we can use it to access the underlying DOM node. Its value will be set when the element is rendered.
+
+let on_submit = move |ev: leptos::ev::SubmitEvent| {
+    // stop the page from reloading!
+    ev.prevent_default();
+
+    // here, we'll extract the value from the input
+    let value = input_element()
+        // event handlers can only fire after the view
+        // is mounted to the DOM, so the `NodeRef` will be `Some`
+        .expect("<input> should be mounted")
+        // `leptos::HtmlElement<html::Input>` implements `Deref`
+        // to a `web_sys::HtmlInputElement`.
+        // this means we can call`HtmlInputElement::value()`
+        // to get the current value of the input
+        .value();
+    set_name(value);
+};
+Our on_submit handler will access the input’s value and use it to call set_name. To access the DOM node stored in the NodeRef, we can simply call it as a function (or using .get()). This will return Option<leptos::HtmlElement<html::Input>>, but we know that the element has already been mounted (how else did you fire this event!), so it's safe to unwrap here.
+
+We can then call .value() to get the value out of the input, because NodeRef gives us access to a correctly-typed HTML element.
+
+Take a look at web_sys and HtmlElement to learn more about using a leptos::HtmlElement. Also see the full CodeSandbox example at the end of this page.
+
+Special Cases: <textarea> and <select>
+Two form elements tend to cause some confusion, in different ways.
+
+<textarea>
+Unlike <input>, the <textarea> element does not support a value attribute. Instead, it receives its value as a plain text node in its HTML children.
+
+In the current version of Leptos (in fact in Leptos 0.1-

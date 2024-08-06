@@ -1,0 +1,268 @@
+etadata.leptos]] which takes three mandatory parameters:
+
+[[workspace.metadata.leptos]]
+# project name
+name = "leptos-project"
+bin-package = "server"
+lib-package = "front"
+
+# more configuration parameters...
+Note the double braces: several projects can be defined and one package can be used in several projects.
+
+
+Build features
+When building with cargo-leptos, the frontend, library package, is compiled into wasm using target wasm-unknown-unknown and the features --no-default-features --features=hydrate The server binary is compiled with the features --no-default-features --features=ssr
+
+
+Parameters reference
+These parameters are used either in the workspace section [[workspace.metadata.leptos]] or the package, for single-package setups, section [package.metadata.leptos].
+
+Note that the Cargo Manifest uses the word target with two different meanings. As a package's configured [[bin]] targets and as the compiled output target triple. Here, the latter is referred to as target-triple.
+
+Compilation parameters
+# Sets the name of the binary target used.
+#
+# Optional, only necessary if the bin-package defines more than one target
+bin-target = "my-bin-name"
+
+# Enables additional file hashes on outputted css, js, and wasm files
+#
+# Optional: Defaults to false. Can also be set with the LEPTOS_HASH_FILES=false env var
+hash-files = false
+
+# Sets the name for the file cargo-leptos uses to track the most recent hashes
+#
+# Optional: Defaults to "hash.txt". Can also be set with the LEPTOS_HASH_FILE_NAME="hash.txt" env var
+hash-file-name = false
+
+# The features to use when compiling all targets
+#
+# Optional. Can be extended with the command line parameter --features
+features = []
+
+# The features to use when compiling the bin target
+#
+# Optional. Can be over-ridden with the command line parameter --bin-features
+bin-features = ["ssr"]
+
+# If the --no-default-features flag should be used when compiling the bin target
+#
+# Optional. Defaults to false.
+bin-default-features = false
+
+# The profile to use for the bin target when compiling for release
+#
+# Optional. Defaults to "release".
+bin-profile-release = "my-release-profile"
+
+# The profile to use for the bin target when compiling for debug
+#
+# Optional. Defaults to "debug".
+bin-profile-dev = "my-debug-profile"
+
+# The target triple to use when compiling the bin target
+#
+# Optional. Env: LEPTOS_BIN_TARGET_TRIPLE
+bin-target-triple = "x86_64-unknown-linux-gnu"
+
+# The features to use when compiling the lib target
+#
+# Optional. Can be over-ridden with the command line parameter --lib-features
+lib-features = ["hydrate"]
+
+# If the --no-default-features flag should be used when compiling the lib target
+#
+# Optional. Defaults to false.
+lib-default-features = false
+
+# The profile to use for the lib target when compiling for release
+#
+# Optional. Defaults to "release".
+lib-profile-release = "my-release-profile"
+
+# The profile to use for the lib target when compiling for debug
+#
+# Optional. Defaults to "debug".
+lib-profile-dev = "my-debug-profile"
+
+# Fixes cargo bug that prevents incremental compilation (see #203)
+#
+# Optional. Defaults to false prior to 0.2.3, unconditionally enabled (with the setting becoming deprecated) since 0.2.3 and #216
+separate-front-target-dir = true
+
+# Pass additional parameters to the cargo process compiling to WASM
+# 
+# Optional. No default
+lib-cargo-args = ["--timings"]
+
+# Pass additional parameters to the cargo process to build the server
+# 
+# Optional. No default
+bin-cargo-args = ["--timings"]
+
+# The command to run instead of "cargo" when building the server
+#
+# Optional. No default. Env: LEPTOS_BIN_CARGO_COMMAND
+bin-cargo-command = "cross"
+Site parameters
+These parameters can be overridden by setting the corresponding environment variable. They can also be set in a .env file as cargo-leptos reads the first it finds in the package or workspace directory and any parent directory.
+
+# Sets the name of the output js, wasm and css files.
+#
+# Optional, defaults to the lib package name or, in a workspace, the project name. Env: LEPTOS_OUTPUT_NAME.
+output-name = "myproj"
+
+# The site root folder is where cargo-leptos generate all output.
+# NOTE: It is relative to the workspace root when running in a workspace.
+# WARNING: all content of this folder will be erased on a rebuild!
+#
+# Optional, defaults to "/site" in the Cargo target directory. Env: LEPTOS_SITE_ROOT.
+site-root = "target/site"
+
+# The site-root relative folder where all compiled output (JS, WASM and CSS) is written.
+#
+# Optional, defaults to "pkg". Env: LEPTOS_SITE_PKG_DIR.
+site-pkg-dir = "pkg"
+
+# The source style file. If it ends with _.sass_ or _.scss_ then it will be compiled by `dart-sass`
+# into CSS and processed by lightning css. When release is set, then it will also be minified.
+#
+# Optional. Env: LEPTOS_STYLE_FILE.
+style-file = "style/main.scss"
+
+# The tailwind input file.
+#
+# Optional, Activates the tailwind build
+tailwind-input-file = "style/tailwind.css"
+
+# The tailwind config file.
+#
+# Optional, defaults to "tailwind.config.js" which if is not present
+# is generated for you
+tailwind-config-file = "tailwind.config.js"
+
+# The browserlist https://browsersl.ist query used for optimizing the CSS.
+#
+# Optional, defaults to "defaults". Env: LEPTOS_BROWSERQUERY.
+browserquery = "defaults"
+
+# Assets source dir. All files found here will be copied and synchronized to site-root.
+# The assets-dir cannot have a sub directory with the same name/path as site-pkg-dir.
+#
+# Optional. Env: LEPTOS_ASSETS_DIR.
+assets-dir = "assets"
+
+# JS source dir. `wasm-bindgen` has the option to include JS snippets from JS files
+# with `#[wasm_bindgen(module = "/js/foo.js")]`. A change in any JS file in this dir
+# will trigger a rebuild.
+#
+# Optional. Defaults to "src"
+js-dir = "src"
+
+# Additional files your application could depends on.
+# A change to any file in those directories will trigger a rebuild.
+#
+# Optional.
+watch-additional-files = ["additional_files", "custom_config.json"]
+
+# The IP and port where the server serves the content. Use it in your server setup.
+#
+# Optional, defaults to 127.0.0.1:3000. Env: LEPTOS_SITE_ADDR.
+site-addr = "127.0.0.1:3000"
+
+# The port number used by the reload server (only used in watch mode).
+#
+# Optional, defaults 3001. Env: LEPTOS_RELOAD_PORT
+reload-port = 3001
+
+# The command used for running end-to-end tests. See the section about End-to-end testing.
+#
+# Optional. Env: LEPTOS_END2END_CMD.
+end2end-cmd = "npx playwright test"
+
+# The directory from which the end-to-end tests are run.
+#
+# Optional. Env: LEPTOS_END2END_DIR
+end2end-dir = "integration"
+
+Environment variables
+The following environment variables are set when compiling the lib (front) or bin (server) and when the server is run.
+
+Echoed from the Leptos config:
+
+LEPTOS_OUTPUT_NAME
+LEPTOS_SITE_ROOT
+LEPTOS_SITE_PKG_DIR
+LEPTOS_SITE_ADDR
+LEPTOS_RELOAD_PORT
+Directories used when building:
+
+LEPTOS_LIB_DIR: The path (relative to the working directory) to the library package
+LEPTOS_BIN_DIR: The path (relative to the working directory) to the binary package
+Note when using directories:
+
+cargo-leptos changes the working directory to the project root or if in a workspace, the workspace root before building and running.
+the two are set to the same value when running in a single-package config.
+Avoid using them at run-time unless you can guarantee that the entire project struct is available at runtime as well.
+Internally the versions of the external tools called by cargo-leptos are hardcoded. Use these environment variables to override the versions cargo-leptos should use (e.g. LEPTOS_SASS_VERSION=1.69.5):
+
+LEPTOS_CARGO_GENERATE_VERSION
+LEPTOS_TAILWIND_VERSION
+LEPTOS_SASS_VERSION
+LEPTOS_WASM_OPT_VERSION
+End-to-end testing
+cargo-leptos provides end-to-end testing support for convenience. It is a simple wrapper around a shell command end2end-cmd that is executed in a specific directory end2end-dir.
+
+The end2end-cmd can be any shell command. For running Playwright it would be npx playwright test.
+
+What it does is equivalent to running this manually:
+
+in a terminal, run cargo leptos watch
+in a separate terminal, change to the end2end-dir and run the end2end-cmd.
+When testing the setup, please try the above first. If that works but cargo leptos end-to-end doesn't then please create a GitHub ticket.
+
+
+The Life of a Page Load
+Before we get into the weeds it might be helpful to have a higher-level overview. What exactly happens between the moment you type in the URL of a server-rendered Leptos app, and the moment you click a button and a counter increases?
+
+I’m assuming some basic knowledge of how the Internet works here, and won’t get into the weeds about HTTP or whatever. Instead, I’ll try to show how different parts of the Leptos APIs map onto each part of the process.
+
+This description also starts from the premise that your app is being compiled for two separate targets:
+
+A server version, often running on Actix or Axum, compiled with the Leptos ssr feature
+A browser version, compiled to WebAssembly (WASM) with the Leptos hydrate feature
+The cargo-leptos build tool exists to coordinate the process of compiling your app for these two different targets.
+
+On the Server
+Your browser makes a GET request for that URL to your server. At this point, the browser knows almost nothing about the page that’s going to be rendered. (The question “How does the browser know where to ask for the page?” is an interesting one, but out of the scope of this tutorial!)
+The server receives that request, and checks whether it has a way to handle a GET request at that path. This is what the .leptos_routes() methods in leptos_axum and leptos_actix are for. When the server starts up, these methods walk over the routing structure you provide in <Routes/>, generating a list of all possible routes your app can handle and telling the server’s router “for each of these routes, if you get a request... hand it off to Leptos.”
+The server sees that this route can be handled by Leptos. So it renders your root component (often called something like <App/>), providing it with the URL that’s being requested and some other data like the HTTP headers and request metadata.
+Your application runs once on the server, building up an HTML version of the component tree that will be rendered at that route. (There’s more to be said here about resources and <Suspense/> in the next chapter.)
+The server returns this HTML page, also injecting information on how to load the version of your app that has been compiled to WASM so that it can run in the browser.
+The HTML page that’s returned is essentially your app, “dehydrated” or “freeze-dried”: it is HTML without any of the reactivity or event listeners you’ve added. The browser will “rehydrate” this HTML page by adding the reactive system and attaching event listeners to that server-rendered HTML. Hence the two feature flags that apply to the two halves of this process: ssr on the server for “server-side rendering”, and hydrate in the browser for that process of rehydration.
+
+In the Browser
+The browser receives this HTML page from the server. It immediately goes back to the server to begin loading the JS and WASM necessary to run the interactive, client side version of the app.
+In the meantime, it renders the HTML version.
+When the WASM version has reloaded, it does the same route-matching process that the server did. Because the <Routes/> component is identical on the server and in the client, the browser version will read the URL and render the same page that was already returned by the server.
+During this initial “hydration” phase, the WASM version of your app doesn’t re-create the DOM nodes that make up your application. Instead, it walks over the existing HTML tree, “picking up” existing elements and adding the necessary interactivity.
+Note that there are some trade-offs here. Before this hydration process is complete, the page will appear interactive but won’t actually respond to interactions. For example, if you have a counter button and click it before WASM has loaded, the count will not increment, because the necessary event listeners and reactivity have not been added yet. We’ll look at some ways to build in “graceful degradation” in future chapters.
+
+Client-Side Navigation
+The next step is very important. Imagine that the user now clicks a link to navigate to another page in your application.
+
+The browser will not make another round trip to the server, reloading the full page as it would for navigating between plain HTML pages or an application that uses server rendering (for example with PHP) but without a client-side half.
+
+Instead, the WASM version of your app will load the new page, right there in the browser, without requesting another page from the server. Essentially, your app upgrades itself from a server-loaded “multi-page app” into a browser-rendered “single-page app.” This yields the best of both worlds: a fast initial load time due to the server-rendered HTML, and fast secondary navigations because of the client-side routing.
+
+Some of what will be described in the following chapters—like the interactions between server functions, resources, and <Suspense/>—may seem overly complicated. You might find yourself asking, “If my page is being rendered to HTML on the server, why can’t I just .await this on the server? If I can just call library X in a server function, why can’t I call it in my component?” The reason is pretty simple: to enable the upgrade from server rendering to client rendering, everything in your application must be able to run either on the server or in the browser.
+
+This is not the only way to create a website or web framework, of course. But it’s the most common way, and we happen to think it’s quite a good way, to create the smoothest possible experience for your users.
+
+
+Async Rendering and SSR “Modes”
+Server-rendering a page that uses only synchronous data is pretty simple: You just walk down the component tree, rendering each element to an HTML string. But this is a pretty big caveat: it doesn’t answer the question of what we should do with pages that includes asynchronous data, i.e., the sort of stuff that would be rendered under a <Suspense/> node on the client.
+
+When a page loads async data that it needs to render, what should we do? Should we wait for all the async data to load, and then render everything at once? (Let’s call this “async” rendering) Should we go all the way in the opposite direction, just sending the HTML we have immediately down to the client and letting the client load the resources and fill them in? (Let’s call this “synchronous” rendering) Or is there some middle-ground solution that somehow beats them both? (Hint: There is.)
+
+If you’ve ever listened to streaming music or watched a video online, I’m sure you realize that HTTP supports streaming, allowing a single connection 

@@ -1,0 +1,169 @@
+WS Lambda is a serverless platform, you'll need to be more careful about how you manage long-lived state. Writing to disk or using a state extractor will not work reliably across requests. Instead, you'll need a database or other microservices that you can query from the Lambda function."
+
+The other factor to bear in mind is the 'cold-start' time for functions as a service - depending on your use case and the FaaS platform you use, this may or may not meet your latency requirements; you may need to keep one function running at all times to optimize the speed of your requests.
+
+Deno & Cloudflare Workers
+Currently, Leptos-Axum supports running in Javascript-hosted WebAssembly runtimes such as Deno, Cloudflare Workers, etc. This option requires some changes to the setup of your source code (for example, in Cargo.toml you must define your app using crate-type = ["cdylib"] and the "wasm" feature must be enabled for leptos_axum). The Leptos HackerNews JS-fetch example demonstrates the required modifications and shows how to run an app in the Deno runtime. Additionally, the leptos_axum crate docs are a helpful reference when setting up your own Cargo.toml file for JS-hosted WASM runtimes.
+
+While the initial setup for JS-hosted WASM runtimes is not onerous, the more important restriction to keep in mind is that since your app will be compiled to WebAssembly (wasm32-unknown-unknown) on the server as well as the client, you must ensure that the crates you use in your app are all WASM-compatible; this may or may not be a deal-breaker depending on your app's requirements, as not all crates in the Rust ecosystem have WASM support.
+
+If you're willing to live with the limitations of WASM server-side, the best place to get started right now is by checking out the example of running Leptos with Deno in the official Leptos Github repo.
+
+Platforms Working on Leptos Support
+Deploy to Spin Serverless WASI (with Leptos SSR)
+WebAssembly on the server has been gaining steam lately, and the developers of the open source serverless WebAssembly framework Spin are working on natively supporting Leptos. While the Leptos-Spin SSR integration is still in its early stages, there is a working example you may wish to try out.
+
+The full set of instructions to get Leptos SSR & Spin working together are available as a post on the Fermyon blog, or if you want to skip the article and just start playing around with a working starter repo, see here.
+
+Deploy to Shuttle.rs
+Several Leptos users have asked about the possibility of using the Rust-friendly Shuttle.rs service to deploy Leptos apps. Unfortunately, Leptos is not officially supported by the Shuttle.rs service at the moment.
+
+However, the folks at Shuttle.rs are committed to getting Leptos support in the future; if you would like to keep up-to-date on the status of that work, keep an eye on this Github issue.
+
+Additionally, some effort has been made to get Shuttle working with Leptos, but to date, deploys to the Shuttle cloud are still not working as expected. That work is available here, if you would like to investigate for yourself or contribute fixes: Leptos Axum Starter Template for Shuttle.rs.
+
+Fly Machines are fast to start and stop, and you don’t pay for their CPU and RAM when they’re in the stopped state. For Fly Apps with a service configured, Fly Proxy can automatically start and stop existing Machines based on incoming requests, so that your app can meet demand without keeping extra Machines running. And if your app needs to have one or more Machines always running in your primary region, then you can set a minimum number of machines to keep running.
+
+The auto start and stop feature also plays well with apps whose Machines exit from within when idle. If your app already shuts down when idle, then the proxy can restart it when there’s traffic.
+
+You might also be interested in learning about scaling the number of machines.
+
+Configure automatic start and stop
+The auto start and stop settings apply per service, so you set them within the [[services]] or [http_service] sections of fly.toml:
+
+For example:
+
+Wrap textCopy to clipboard
+...
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+...
+Briefly, the settings are:
+
+auto_start_machines: Whether Fly Proxy should automatically start Machines based on requests and capacity.
+auto_stop_machines: Whether Fly Proxy should automatically stop Machines when the app is idle for several minutes.
+min_machines_running: The minimum number of Machines to keep running in the primary region when auto_stop_machines = true.
+Concurrency limits for services affect how automatic starts and stops work.
+
+Default values
+The default settings for apps that don’t specify any auto start and stop settings in fly.toml are auto_start_machines = true and auto_stop_machines = false.
+
+When you create an app using the fly launch command, the default settings in fly.toml are:
+
+Wrap textCopy to clipboard
+...
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+...
+Recommended settings
+If your app already exits when idle, then you can set auto_start_machines = true and auto_stop_machines = false to have Fly Proxy automatically restart the Machines stopped by your app.
+
+If your app doesn’t exit when idle, then we recommend setting auto_stop_machines and auto_start_machines to the same value (either both true or both false) so that Fly Proxy doesn’t stop Machines and never restart them. For example, if auto_start_machines = false and auto_stop_machines = true, then Fly Proxy automatically stops your Machines when there’s low traffic but doesn’t start them again. When all or most of your Machines stop, requests to your app could start failing.
+
+To keep one or more Machines running all the time in your primary region, set min_machines_running to 1 or higher. min_machines_running has no effect unless you set auto_stop_machines = true.
+
+min_machines_running does not apply to Machines running in non-primary regions. For example, if min_machines_running = 1 and there’s no traffic to your app, then Fly Proxy will stop Machines until eventually there is only one Machine running in your primary region.
+
+There’s no “maximum machines running” setting, because the maximum number of Machines is just the total number of Machines you’ve created for your app. Learn more in the How it works section.
+
+How it works
+The Fly Proxy runs a process to automatically stop and start existing Fly Machines every few minutes.
+
+The automatic start and stop feature only works on existing Machines and never creates or destroys Machines for you. The maximum number of running Machines is the number of Machines you’ve created for your app using fly scale count or fly machine clone. Learn more about scaling the number of Machines.
+
+Fly Proxy stops Machines
+When auto_stop_machines = true in your fly.toml, the proxy looks at Machines running in a single region and uses the concurrency soft_limit setting for each Machine to determine if there’s excess capacity. If the proxy decides there’s excess capacity, it stops exactly one Machine. The proxy repeats this process every few minutes, stopping only one Machine per region, if needed, each time.
+
+If you have the kill_signal and kill_timeout options configured in your fly.toml file, then Fly Proxy uses those settings when it stops a Machine.
+
+Fly Proxy determines excess capacity per region as follows:
+
+If there’s more than one Machine in the region:
+the proxy determines how many running Machines are over their soft_limit setting and then calculates excess capacity: excess capacity = num of machines - (num machines over soft limit + 1)
+if excess capacity is 1 or greater, then the proxy stops one Machine
+If there’s only one Machine in the region:
+the proxy checks if the Machine has any traffic
+if the Machine has no traffic (a load of 0), then the proxy stops the Machine
+Fly Proxy starts Machines
+When auto_start_machines = true in your fly.toml, the Fly Proxy restarts a Machine in the nearest region when required.
+
+Fly Proxy determines when to start a Machine as follows:
+
+The proxy waits for a request to your app.
+If all the running Machines are above their soft_limit setting, then the proxy starts a stopped Machine in the nearest region (if there are any stopped Machines).
+The proxy routes the request to the newly started Machine.
+When to stop and start Fly Machines automatically, or not
+If your app has highly variable request workloads, then you can set auto_stop_machines and auto_start_machines to true to manage your Fly Machines as demand decreases and increases. This could reduce costs, because you’ll never have to run excess Machines to handle peak load; you’ll only run, and get charged for, the number of Machines that you need.
+
+The difference between this feature and what’s typical in autoscaling, is that it doesn’t create new Machines up to a specified maximum. It automatically starts only existing Machines. For example, if you want to have a maximum of 10 Machines available to service requests, then you need to create 10 Machines for your app.
+
+If you need all your app’s Machines to run continuously, then you can set auto_stop_machines and auto_start_machines to false.
+
+If you only need a certain number of your app’s Machines to run continuously, then you can set auto_stop_machines = true and min_machines_running to 1 or higher.
+
+Stop a Machine by terminating its main process
+Setting your app to automatically stop when there’s excess capacity using auto_stop_machines = true is a substitute for when your app doesn’t shut itself down automatically after a period of inactivity. If you want a custom shutdown process for your app, then you can code your app to exit from within when idle.
+
+
+Optimizing WASM Binary Size
+One of the primary downsides of deploying a Rust/WebAssembly frontend app is that splitting a WASM file into smaller chunks to be dynamically loaded is significantly more difficult than splitting a JavaScript bundle. There have been experiments like wasm-split in the Emscripten ecosystem but at present there’s no way to split and dynamically load a Rust/wasm-bindgen binary. This means that the whole WASM binary needs to be loaded before your app becomes interactive. Because the WASM format is designed for streaming compilation, WASM files are much faster to compile per kilobyte than JavaScript files. (For a deeper look, you can read this great article from the Mozilla team on streaming WASM compilation.)
+
+Still, it’s important to ship the smallest WASM binary to users that you can, as it will reduce their network usage and make your app interactive as quickly as possible.
+
+So what are some practical steps?
+
+Things to Do
+Make sure you’re looking at a release build. (Debug builds are much, much larger.)
+Add a release profile for WASM that optimizes for size, not speed.
+For a cargo-leptos project, for example, you can add this to your Cargo.toml:
+
+[profile.wasm-release]
+inherits = "release"
+opt-level = 'z'
+lto = true
+codegen-units = 1
+
+# ....
+
+[package.metadata.leptos]
+# ....
+lib-profile-release = "wasm-release"
+This will hyper-optimize the WASM for your release build for size, while keeping your server build optimized for speed. (For a pure client-rendered app without server considerations, just use the [profile.wasm-release] block as your [profile.release].)
+
+Always serve compressed WASM in production. WASM tends to compress very well, typically shrinking to less than 50% its uncompressed size, and it’s trivial to enable compression for static files being served from Actix or Axum.
+
+If you’re using nightly Rust, you can rebuild the standard library with this same profile rather than the prebuilt standard library that’s distributed with the wasm32-unknown-unknown target.
+
+To do this, create a file in your project at .cargo/config.toml
+
+[unstable]
+build-std = ["std", "panic_abort", "core", "alloc"]
+build-std-features = ["panic_immediate_abort"]
+Note that if you're using this with SSR too, the same Cargo profile will be applied. You'll need to explicitly specify your target:
+
+[build]
+target = "x86_64-unknown-linux-gnu" # or whatever
+Also note that in some cases, the cfg feature has_std will not be set, which may cause build errors with some dependencies which check for has_std. You may fix any build errors due to this by adding:
+
+[build]
+rustflags = ["--cfg=has_std"]
+And you'll need to add panic = "abort" to [profile.release] in Cargo.toml. Note that this applies the same build-std and panic settings to your server binary, which may not be desirable. Some further exploration is probably needed here.
+
+One of the sources of binary size in WASM binaries can be serde serialization/deserialization code. Leptos uses serde by default to serialize and deserialize resources created with create_resource. You might try experimenting with the miniserde and serde-lite features, which allow you to use those crates for serialization and deserialization instead; each only implements a subset of serde’s functionality, but typically optimizes for size over speed.
+Things to Avoid
+There are certain crates that tend to inflate binary sizes. For example, the regex crate with its default features adds about 500kb to a WASM binary (largely because it has to pull in Unicode table data!). In a size-conscious setting, you might consider avoiding regexes in general, or even dropping down and calling browser APIs to use the built-in regex engine instead. (This is what leptos_router does on the few occasions it needs a regular expression.)
+
+In general, Rust’s commitment to runtime performance is sometimes at odds with a commitment to a small binary. For example, Rust monomorphizes generic functions, meaning it creates a distinct copy of the function for each generic type it’s called with. This is significantly faster than dynamic dispatch, but increases binary size. Leptos tries to balance runtime performance with binary size considerations pretty carefully; but you might find that writing code that uses many generics tends to increase binary size. For example, if you have a generic component with a lot of code in its body and call it with four different types, remember that the compiler could include four copies of that same code. Refactoring to use a concrete inner function or helper can often maintain performance and ergonomics while reducing binary size.
+
+A Final Thought
+Remember that in a server-rendered app, JS bundle size/WASM binary size affects only one thing: time to interactivity on the first load. This is very important to a good user experience: nobody wants to click a button three times and have it do nothing because the interactive code is still loading — but it's not the only important measure.
+
+It’s especially worth remembering that streaming in a single WASM binary means all subsequent navigations are ne

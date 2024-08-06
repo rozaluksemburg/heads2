@@ -1,0 +1,530 @@
+r for T
+
+Enum leptos_server::ServerFnErrorCopy item path
+source · [−]
+pub enum ServerFnError<E = NoCustomError> {
+    WrappedServerError(E),
+    Registration(String),
+    Request(String),
+    Response(String),
+    ServerError(String),
+    Deserialization(String),
+    Serialization(String),
+    Args(String),
+    MissingArg(String),
+}
+Type for errors that can occur when using server functions.
+
+Unlike ServerFnErrorErr, this does not implement Error. This means that other error types can easily be converted into it using the ? operator.
+
+Variants
+WrappedServerError(E)
+A user-defined custom error type, which defaults to NoCustomError.
+
+Registration(String)
+Error while trying to register the server function (only occurs in case of poisoned RwLock).
+
+Request(String)
+Occurs on the client if there is a network error while trying to run function on server.
+
+Response(String)
+Occurs on the server if there is an error creating an HTTP response.
+
+ServerError(String)
+Occurs when there is an error while actually running the function on the server.
+
+Deserialization(String)
+Occurs on the client if there is an error deserializing the server’s response.
+
+Serialization(String)
+Occurs on the client if there is an error serializing the server function arguments.
+
+Args(String)
+Occurs on the server if there is an error deserializing one of the arguments that’s been sent.
+
+MissingArg(String)
+Occurs on the server if there’s a missing argument.
+
+Implementations
+source
+impl ServerFnError
+source
+pub fn new(msg: impl ToString) -> ServerFnError
+Constructs a new ServerFnError::ServerError from some other type.
+
+Trait Implementations
+source
+impl<E> Clone for ServerFnError<E>
+where
+    E: Clone,
+source
+fn clone(&self) -> ServerFnError<E>
+Returns a copy of the value. Read more
+1.0.0 · source
+fn clone_from(&mut self, source: &Self)
+Performs copy-assignment from source. Read more
+source
+impl<E> Debug for ServerFnError<E>
+where
+    E: Debug,
+source
+fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error>
+Formats the value using the given formatter. Read more
+source
+impl<'de, E> Deserialize<'de> for ServerFnError<E>
+where
+    E: Deserialize<'de>,
+source
+fn deserialize<__D>(
+    __deserializer: __D
+) -> Result<ServerFnError<E>, <__D as Deserializer<'de>>::Error>
+where
+    __D: Deserializer<'de>,
+Deserialize this value from the given Serde deserializer. Read more
+source
+impl<CustErr> Display for ServerFnError<CustErr>
+where
+    CustErr: Display,
+source
+fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error>
+Formats the value using the given formatter. Read more
+source
+impl<E> Error for ServerFnError<E>
+where
+    E: Error + 'static,
+    ServerFnError<E>: Display,
+source
+fn source(&self) -> Option<&(dyn Error + 'static)>
+The lower-level source of this error, if any. Read more
+1.0.0 · source
+fn description(&self) -> &str
+👎Deprecated since 1.42.0: use the Display impl or to_string()
+Read more
+1.0.0 · source
+fn cause(&self) -> Option<&dyn Error>
+👎Deprecated since 1.33.0: replaced by Error::source, which can support downcasting
+source
+fn provide<'a>(&'a self, request: &mut Request<'a>)
+🔬This is a nightly-only experimental API. (error_generic_member_access)
+Provides type based access to context intended for error reports. Read more
+source
+impl<CustErr> From<CustErr> for ServerFnError<CustErr>
+source
+fn from(value: CustErr) -> ServerFnError<CustErr>
+Converts to this type from the input type.
+source
+impl<E> From<E> for ServerFnError
+where
+    E: Error,
+source
+fn from(value: E) -> ServerFnError
+Converts to this type from the input type.
+source
+impl<CustErr> From<ServerFnError<CustErr>> for ServerFnErrorErr<CustErr>
+source
+fn from(value: ServerFnError<CustErr>) -> ServerFnErrorErr<CustErr>
+Converts to this type from the input type.
+source
+impl<CustErr> From<ServerFnUrlError<CustErr>> for ServerFnError<CustErr>
+source
+fn from(error: ServerFnUrlError<CustErr>) -> ServerFnError<CustErr>
+Converts to this type from the input type.
+source
+impl<E> PartialEq for ServerFnError<E>
+where
+    E: PartialEq,
+source
+fn eq(&self, other: &ServerFnError<E>) -> bool
+This method tests for self and other values to be equal, and is used by ==.
+1.0.0 · source
+fn ne(&self, other: &Rhs) -> bool
+This method tests for !=. The default implementation is almost always sufficient, and should not be overridden without very good reason.
+source
+impl<E> Serialize for ServerFnError<E>
+where
+    E: Serialize,
+source
+fn serialize<__S>(
+    &self,
+    __serializer: __S
+) -> Result<<__S as Serializer>::Ok, <__S as Serializer>::Error>
+where
+    __S: Serializer,
+Serialize this value into the given Serde serializer. Read more
+source
+impl<CustErr> ServerFnErrorSerde for ServerFnError<CustErr>
+where
+    CustErr: FromStr + Display,
+source
+fn ser(&self) -> Result<String, Error>
+Converts the custom error type to a String.
+source
+fn de(data: &str) -> ServerFnError<CustErr>
+Deserializes the custom error type from a String.
+source
+impl<E> Eq for ServerFnError<E>
+where
+    E: Eq,
+source
+impl<E> StructuralPartialEq for ServerFnError<E>
+Auto Trait Implementations
+impl<E> Freeze for ServerFnError<E>
+where
+    E: Freeze,
+impl<E> RefUnwindSafe for ServerFnError<E>
+where
+    E: RefUnwindSafe,
+impl<E> Send for ServerFnError<E>
+where
+    E: Send,
+impl<E> Sync for ServerFnError<E>
+where
+    E: Sync,
+impl<E> Unpin for ServerFnError<E>
+where
+    E: Unpin,
+impl<E> UnwindSafe for ServerFnError<E>
+where
+    E: UnwindSafe,
+Blanket Implementations
+source
+impl<T> Any for T
+where
+    T: 'static + ?Sized,
+source
+impl<T> Borrow<T> for T
+where
+    T: ?Sized,
+source
+impl<T> BorrowMut<T> for T
+where
+    T: ?Sized,
+source
+impl<Q, K> Equivalent<K> for Q
+where
+    Q: Eq + ?Sized,
+    K: Borrow<Q> + ?Sized,
+source
+impl<Q, K> Equivalent<K> for Q
+where
+    Q: Eq + ?Sized,
+    K: Borrow<Q> + ?Sized,
+source
+impl<T> From<!> for T
+source
+impl<T> From<T> for T
+source
+impl<CustErr, T, Request> FromReq<Cbor, Request, CustErr> for T
+where
+    Request: Req<CustErr> + Send + 'static,
+    T: DeserializeOwned,
+source
+impl<CustErr, T, Request> FromReq<Json, Request, CustErr> for T
+where
+    Request: Req<CustErr> + Send + 'static,
+    T: DeserializeOwned,
+source
+impl<CustErr, T, Request> FromReq<Streaming, Request, CustErr> for T
+where
+    Request: Req<CustErr> + Send + 'static,
+    T: From<ByteStream> + 'static,
+source
+impl<CustErr, T, Request> FromReq<StreamingText, Request, CustErr> for T
+where
+    Request: Req<CustErr> + Send + 'static,
+    T: From<TextStream> + 'static,
+source
+impl<CustErr, T, Response> FromRes<Cbor, Response, CustErr> for T
+where
+    Response: ClientRes<CustErr> + Send,
+    T: DeserializeOwned + Send,
+source
+impl<CustErr, T, Response> FromRes<Json, Response, CustErr> for T
+where
+    Response: ClientRes<CustErr> + Send,
+    T: DeserializeOwned + Send,
+source
+impl<T> Instrument for T
+source
+impl<T, U> Into<U> for T
+where
+    U: From<T>,
+source
+impl<CustErr, T, Request> IntoReq<Cbor, Request, CustErr> for T
+where
+    Request: ClientReq<CustErr>,
+    T: Serialize + Send,
+source
+impl<CustErr, T, Request> IntoReq<Json, Request, CustErr> for T
+where
+    Request: ClientReq<CustErr>,
+    T: Serialize + Send,
+source
+impl<CustErr, T, Response> IntoRes<Cbor, Response, CustErr> for T
+where
+    Response: Res<CustErr>,
+    T: Serialize + Send,
+source
+impl<CustErr, T, Response> IntoRes<Json, Response, CustErr> for T
+where
+    Response: Res<CustErr>,
+    T: Serialize + Send,
+source
+impl<T> Serializable for T
+where
+    T: DeserializeOwned + Serialize,
+source
+impl<T> ToOwned for T
+where
+    T: Clone,
+source
+impl<T> ToString for T
+where
+    T: Display + ?Sized,
+source
+impl<T, U> TryFrom<U> for T
+where
+    U: Into<T>,
+source
+impl<T, U> TryInto<U> for T
+where
+    U: TryFrom<T>,
+source
+impl<T> WithSubscriber for T
+source
+impl<T> DeserializeOwned for T
+where
+    T: for<'de> Deserialize<'de>,
+
+Enum leptos_server::ServerFnErrorErrCopy item path
+source · [−]
+pub enum ServerFnErrorErr<E = NoCustomError> {
+    WrappedServerError(E),
+    Registration(String),
+    Request(String),
+    ServerError(String),
+    Deserialization(String),
+    Serialization(String),
+    Args(String),
+    MissingArg(String),
+    Response(String),
+}
+Type for errors that can occur when using server functions.
+
+Unlike ServerFnError, this implements std::error::Error. This means it can be used in situations in which the Error trait is required, but it’s not possible to create a blanket implementation that converts other errors into this type.
+
+ServerFnError and ServerFnErrorErr mutually implement From, so it is easy to convert between the two types.
+
+Variants
+WrappedServerError(E)
+A user-defined custom error type, which defaults to NoCustomError.
+
+Registration(String)
+Error while trying to register the server function (only occurs in case of poisoned RwLock).
+
+Request(String)
+Occurs on the client if there is a network error while trying to run function on server.
+
+ServerError(String)
+Occurs when there is an error while actually running the function on the server.
+
+Deserialization(String)
+Occurs on the client if there is an error deserializing the server’s response.
+
+Serialization(String)
+Occurs on the client if there is an error serializing the server function arguments.
+
+Args(String)
+Occurs on the server if there is an error deserializing one of the arguments that’s been sent.
+
+MissingArg(String)
+Occurs on the server if there’s a missing argument.
+
+Response(String)
+Occurs on the server if there is an error creating an HTTP response.
+
+Trait Implementations
+source
+impl<E> Clone for ServerFnErrorErr<E>
+where
+    E: Clone,
+source
+fn clone(&self) -> ServerFnErrorErr<E>
+Returns a copy of the value. Read more
+1.0.0 · source
+fn clone_from(&mut self, source: &Self)
+Performs copy-assignment from source. Read more
+source
+impl<E> Debug for ServerFnErrorErr<E>
+where
+    E: Debug,
+source
+fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error>
+Formats the value using the given formatter. Read more
+source
+impl<E> Display for ServerFnErrorErr<E>
+where
+    E: Display,
+source
+fn fmt(&self, __formatter: &mut Formatter<'_>) -> Result<(), Error>
+Formats the value using the given formatter. Read more
+source
+impl<E> Error for ServerFnErrorErr<E>
+where
+    ServerFnErrorErr<E>: Debug + Display,
+1.30.0 · source
+fn source(&self) -> Option<&(dyn Error + 'static)>
+The lower-level source of this error, if any. Read more
+1.0.0 · source
+fn description(&self) -> &str
+👎Deprecated since 1.42.0: use the Display impl or to_string()
+Read more
+1.0.0 · source
+fn cause(&self) -> Option<&dyn Error>
+👎Deprecated since 1.33.0: replaced by Error::source, which can support downcasting
+source
+fn provide<'a>(&'a self, request: &mut Request<'a>)
+🔬This is a nightly-only experimental API. (error_generic_member_access)
+Provides type based access to context intended for error reports. Read more
+source
+impl<CustErr> From<ServerFnError<CustErr>> for ServerFnErrorErr<CustErr>
+source
+fn from(value: ServerFnError<CustErr>) -> ServerFnErrorErr<CustErr>
+Converts to this type from the input type.
+source
+impl<CustErr> From<ServerFnUrlError<CustErr>> for ServerFnErrorErr<CustErr>
+source
+fn from(error: ServerFnUrlError<CustErr>) -> ServerFnErrorErr<CustErr>
+Converts to this type from the input type.
+source
+impl<E> PartialEq for ServerFnErrorErr<E>
+where
+    E: PartialEq,
+source
+fn eq(&self, other: &ServerFnErrorErr<E>) -> bool
+This method tests for self and other values to be equal, and is used by ==.
+1.0.0 · source
+fn ne(&self, other: &Rhs) -> bool
+This method tests for !=. The default implementation is almost always sufficient, and should not be overridden without very good reason.
+source
+impl<E> Eq for ServerFnErrorErr<E>
+where
+    E: Eq,
+source
+impl<E> StructuralPartialEq for ServerFnErrorErr<E>
+Auto Trait Implementations
+impl<E> Freeze for ServerFnErrorErr<E>
+where
+    E: Freeze,
+impl<E> RefUnwindSafe for ServerFnErrorErr<E>
+where
+    E: RefUnwindSafe,
+impl<E> Send for ServerFnErrorErr<E>
+where
+    E: Send,
+impl<E> Sync for ServerFnErrorErr<E>
+where
+    E: Sync,
+impl<E> Unpin for ServerFnErrorErr<E>
+where
+    E: Unpin,
+impl<E> UnwindSafe for ServerFnErrorErr<E>
+where
+    E: UnwindSafe,
+Blanket Implementations
+source
+impl<T> Any for T
+where
+    T: 'static + ?Sized,
+source
+impl<T> Borrow<T> for T
+where
+    T: ?Sized,
+source
+impl<T> BorrowMut<T> for T
+where
+    T: ?Sized,
+source
+impl<Q, K> Equivalent<K> for Q
+where
+    Q: Eq + ?Sized,
+    K: Borrow<Q> + ?Sized,
+source
+impl<Q, K> Equivalent<K> for Q
+where
+    Q: Eq + ?Sized,
+    K: Borrow<Q> + ?Sized,
+source
+impl<T> From<T> for T
+source
+impl<T> Instrument for T
+source
+impl<T, U> Into<U> for T
+where
+    U: From<T>,
+source
+impl<T> ToOwned for T
+where
+    T: Clone,
+source
+impl<T> ToString for T
+where
+    T: Display + ?Sized,
+source
+impl<T, U> TryFrom<U> for T
+where
+    U: Into<T>,
+source
+impl<T, U> TryInto<U> for T
+where
+    U: TryFrom<T>,
+source
+impl<T> WithSubscriber for T
+
+Function leptos_server::create_actionCopy item path
+source · [−]
+pub fn create_action<I, O, F, Fu>(action_fn: F) -> Action<I, O>
+where
+    I: 'static,
+    O: 'static,
+    F: Fn(&I) -> Fu + 'static,
+    Fu: Future<Output = O> + 'static,
+Creates an Action to synchronize an imperative async call to the synchronous reactive system.
+
+If you’re trying to load data by running an async function reactively, you probably want to use a create_resource instead. If you’re trying to occasionally run an async function in response to something like a user clicking a button, you’re in the right place.
+
+async fn send_new_todo_to_api(task: String) -> usize {
+    // do something...
+    // return a task id
+    42
+}
+let save_data = create_action(|task: &String| {
+  // `task` is given as `&String` because its value is available in `input`
+  send_new_todo_to_api(task.clone())
+});
+
+// the argument currently running
+let input = save_data.input();
+// the most recent returned result
+let result_of_call = save_data.value();
+// whether the call is pending
+let pending = save_data.pending();
+// how many times the action has run
+// useful for reactively updating something else in response to a `dispatch` and response
+let version = save_data.version();
+
+// before we do anything
+assert_eq!(input.get(), None); // no argument yet
+assert_eq!(pending.get(), false); // isn't pending a response
+assert_eq!(result_of_call.get(), None); // there's no "last value"
+assert_eq!(version.get(), 0);
+// dispatch the action
+save_data.dispatch("My todo".to_string());
+
+// when we're making the call
+// assert_eq!(input.get(), Some("My todo".to_string()));
+// assert_eq!(pending.get(), true); // is pending
+// assert_eq!(result_of_call.get(), None); // has not yet gotten a response
+
+// after call has resolved
+assert_eq!(input.get(), None); // input clears ou

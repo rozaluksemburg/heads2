@@ -1,0 +1,406 @@
+ let (toggled, set_toggled) = create_signal(false);
+
+    // share `set_toggled` with all children of this component
+    provide_context(set_toggled);
+
+    view! {
+        <p>"Toggled? " {toggled}</p>
+        <Layout/>
+    }
+}
+
+// <Layout/> and <Content/> omitted
+// To work in this version, drop their references to set_toggled
+
+#[component]
+pub fn ButtonD() -> impl IntoView {
+    // use_context searches up the context tree, hoping to
+    // find a `WriteSignal<bool>`
+    // in this case, I .expect() because I know I provided it
+    let setter = use_context::<WriteSignal<bool>>()
+        .expect("to have found the setter provided");
+
+    view! {
+        <button
+            on:click=move |_| setter.update(|value| *value = !*value)
+        >
+            "Toggle"
+        </button>
+    }
+}
+The same caveats apply to this as to <ButtonA/>: passing a WriteSignal around should be done with caution, as it allows you to mutate state from arbitrary parts of your code. But when done carefully, this can be one of the most effective techniques for global state management in Leptos: simply provide the state at the highest level you’ll need it, and use it wherever you need it lower down.
+
+Note that there are no performance downsides to this approach. Because you are passing a fine-grained reactive signal, nothing happens in the intervening components (<Layout/> and <Content/>) when you update it. You are communicating directly between <ButtonD/> and <App/>. In fact—and this is the power of fine-grained reactivity—you are communicating directly between a button click in <ButtonD/> and a single text node in <App/>. It’s as if the components themselves don’t exist at all. And, well... at runtime, they don’t. It’s just signals and effects, all the way down.
+
+use leptos::{ev::MouseEvent, *};
+
+// This highlights four different ways that child components can communicate
+// with their parent:
+// 1) <ButtonA/>: passing a WriteSignal as one of the child component props,
+//    for the child component to write into and the parent to read
+// 2) <ButtonB/>: passing a closure as one of the child component props, for
+//    the child component to call
+// 3) <ButtonC/>: adding an `on:` event listener to a component
+// 4) <ButtonD/>: providing a context that is used in the component (rather than prop drilling)
+
+#[derive(Copy, Clone)]
+struct SmallcapsContext(WriteSignal<bool>);
+
+#[component]
+pub fn App() -> impl IntoView {
+    // just some signals to toggle three classes on our <p>
+    let (red, set_red) = create_signal(false);
+    let (right, set_right) = create_signal(false);
+    let (italics, set_italics) = create_signal(false);
+    let (smallcaps, set_smallcaps) = create_signal(false);
+
+    // the newtype pattern isn't *necessary* here but is a good practice
+    // it avoids confusion with other possible future `WriteSignal<bool>` contexts
+    // and makes it easier to refer to it in ButtonC
+    provide_context(SmallcapsContext(set_smallcaps));
+
+    view! {
+        <main>
+            <p
+                // class: attributes take F: Fn() => bool, and these signals all implement Fn()
+                class:red=red
+                class:right=right
+                class:italics=italics
+                class:smallcaps=smallcaps
+            >
+                "Lorem ipsum sit dolor amet."
+            </p>
+
+            // Button A: pass the signal setter
+            <ButtonA setter=set_red/>
+
+            // Button B: pass a closure
+            <ButtonB on_click=move |_| set_right.update(|value| *value = !*value)/>
+
+            // Button B: use a regular event listener
+            // setting an event listener on a component like this applies it
+            // to each of the top-level elements the component returns
+            <ButtonC on:click=move |_| set_italics.update(|value| *value = !*value)/>
+
+            // Button D gets its setter from context rather than props
+            <ButtonD/>
+        </main>
+    }
+}
+
+/// Button A receives a signal setter and updates the signal itself
+#[component]
+pub fn ButtonA(
+    /// Signal that will be toggled when the button is clicked.
+    setter: WriteSignal<bool>,
+) -> impl IntoView {
+    view! {
+        <button
+            on:click=move |_| setter.update(|value| *value = !*value)
+        >
+            "Toggle Red"
+        </button>
+    }
+}
+
+/// Button B receives a closure
+#[component]
+pub fn ButtonB<F>(
+    /// Callback that will be invoked when the button is clicked.
+    on_click: F,
+) -> impl IntoView
+where
+    F: Fn(MouseEvent) + 'static,
+{
+    view! {
+        <button
+            on:click=on_click
+        >
+            "Toggle Right"
+        </button>
+    }
+
+    // just a note: in an ordinary function ButtonB could take on_click: impl Fn(MouseEvent) + 'static
+    // and save you from typing out the generic
+    // the component macro actually expands to define a
+    //
+    // struct ButtonBProps<F> where F: Fn(MouseEvent) + 'static {
+    //   on_click: F
+    // }
+    //
+    // this is what allows us to have named props in our component invocation,
+    // instead of an ordered list of function arguments
+    // if Rust ever had named function arguments we could drop this requirement
+}
+
+/// Button C is a dummy: it renders a button but doesn't handle
+/// its click. Instead, the parent component adds an event listener.
+#[component]
+pub fn ButtonC() -> impl IntoView {
+    view! {
+        <button>
+            "Toggle Italics"
+        </button>
+    }
+}
+
+/// Button D is very similar to Button A, but instead of passing the setter as a prop
+/// we get it from the context
+#[component]
+pub fn ButtonD() -> impl IntoView {
+    let setter = use_context::<SmallcapsContext>().unwrap().0;
+
+    view! {
+        <button
+            on:click=move |_| setter.update(|value| *value = !*value)
+        >
+            "Toggle Small Caps"
+        </button>
+    }
+}
+
+fn main() {
+    leptos::mount_to_body(App)
+}
+
+
+Component Children
+It’s pretty common to want to pass children into a component, just as you can pass children into an HTML element. For example, imagine I have a <FancyForm/> component that enhances an HTML <form>. I need some way to pass all its inputs.
+
+view! {
+    <Form>
+        <fieldset>
+            <label>
+                "Some Input"
+                <input type="text" name="something"/>
+            </label>
+        </fieldset>
+        <button>"Submit"</button>
+    </Form>
+}
+How can you do this in Leptos? There are basically two ways to pass components to other components:
+
+render props: properties that are functions that return a view
+the children prop: a special component property that includes anything you pass as a child to the component.
+In fact, you’ve already seen these both in action in the <Show/> component:
+
+view! {
+  <Show
+    // `when` is a normal prop
+    when=move || value() > 5
+    // `fallback` is a "render prop": a function that returns a view
+    fallback=|| view! { <Small/> }
+  >
+    // `<Big/>` (and anything else here)
+    // will be given to the `children` prop
+    <Big/>
+  </Show>
+}
+Let’s define a component that takes some children and a render prop.
+
+#[component]
+pub fn TakesChildren<F, IV>(
+    /// Takes a function (type F) that returns anything that can be
+    /// converted into a View (type IV)
+    render_prop: F,
+    /// `children` takes the `Children` type
+    children: Children,
+) -> impl IntoView
+where
+    F: Fn() -> IV,
+    IV: IntoView,
+{
+    view! {
+        <h2>"Render Prop"</h2>
+        {render_prop()}
+
+        <h2>"Children"</h2>
+        {children()}
+    }
+}
+render_prop and children are both functions, so we can call them to generate the appropriate views. children, in particular, is an alias for Box<dyn FnOnce() -> Fragment>. (Aren't you glad we named it Children instead?)
+
+If you need a Fn or FnMut here because you need to call children more than once, we also provide ChildrenFn and ChildrenMut aliases.
+
+We can use the component like this:
+
+view! {
+    <TakesChildren render_prop=|| view! { <p>"Hi, there!"</p> }>
+        // these get passed to `children`
+        "Some text"
+        <span>"A span"</span>
+    </TakesChildren>
+}
+Manipulating Children
+The Fragment type is basically a way of wrapping a Vec<View>. You can insert it anywhere into your view.
+
+But you can also access those inner views directly to manipulate them. For example, here’s a component that takes its children and turns them into an unordered list.
+
+#[component]
+pub fn WrapsChildren(children: Children) -> impl IntoView {
+    // Fragment has `nodes` field that contains a Vec<View>
+    let children = children()
+        .nodes
+        .into_iter()
+        .map(|child| view! { <li>{child}</li> })
+        .collect_view();
+
+    view! {
+        <ul>{children}</ul>
+    }
+}
+Calling it like this will create a list:
+
+
+view! {
+    <WrapsChildren>
+        "A"
+        "B"
+        "C"
+    </WrapsChildren>
+}
+
+other code 
+
+use leptos::*;
+
+// Often, you want to pass some kind of child view to another
+// component. There are two basic patterns for doing this:
+// - "render props": creating a component prop that takes a function
+//   that creates a view
+// - the `children` prop: a special property that contains content
+//   passed as the children of a component in your view, not as a
+//   property
+
+#[component]
+pub fn App() -> impl IntoView {
+    let (items, set_items) = create_signal(vec![0, 1, 2]);
+    let render_prop = move || {
+        // items.with(...) reacts to the value without cloning
+        // by applying a function. Here, we pass the `len` method
+        // on a `Vec<_>` directly
+        let len = move || items.with(Vec::len);
+        view! {
+            <p>"Length: " {len}</p>
+        }
+    };
+
+    view! {
+        // This component just displays the two kinds of children,
+        // embedding them in some other markup
+        <TakesChildren
+            // for component props, you can shorthand
+            // `render_prop=render_prop` => `render_prop`
+            // (this doesn't work for HTML element attributes)
+            render_prop
+        >
+            // these look just like the children of an HTML element
+            <p>"Here's a child."</p>
+            <p>"Here's another child."</p>
+        </TakesChildren>
+        <hr/>
+        // This component actually iterates over and wraps the children
+        <WrapsChildren>
+            <p>"Here's a child."</p>
+            <p>"Here's another child."</p>
+        </WrapsChildren>
+    }
+}
+
+/// Displays a `render_prop` and some children within markup.
+#[component]
+pub fn TakesChildren<F, IV>(
+    /// Takes a function (type F) that returns anything that can be
+    /// converted into a View (type IV)
+    render_prop: F,
+    /// `children` takes the `Children` type
+    /// this is an alias for `Box<dyn FnOnce() -> Fragment>`
+    /// ... aren't you glad we named it `Children` instead?
+    children: Children,
+) -> impl IntoView
+where
+    F: Fn() -> IV,
+    IV: IntoView,
+{
+    view! {
+        <h1><code>"<TakesChildren/>"</code></h1>
+        <h2>"Render Prop"</h2>
+        {render_prop()}
+        <hr/>
+        <h2>"Children"</h2>
+        {children()}
+    }
+}
+
+/// Wraps each child in an `<li>` and embeds them in a `<ul>`.
+#[component]
+pub fn WrapsChildren(children: Children) -> impl IntoView {
+    // children() returns a `Fragment`, which has a
+    // `nodes` field that contains a Vec<View>
+    // this means we can iterate over the children
+    // to create something new!
+    let children = children()
+        .nodes
+        .into_iter()
+        .map(|child| view! { <li>{child}</li> })
+        .collect::<Vec<_>>();
+
+    view! {
+        <h1><code>"<WrapsChildren/>"</code></h1>
+        // wrap our wrapped children in a UL
+        <ul>{children}</ul>
+    }
+}
+
+fn main() {
+    leptos::mount_to_body(App)
+}
+
+
+No Macros: The View Builder Syntax
+If you’re perfectly happy with the view! macro syntax described so far, you’re welcome to skip this chapter. The builder syntax described in this section is always available, but never required.
+
+For one reason or another, many developers would prefer to avoid macros. Perhaps you don’t like the limited rustfmt support. (Although, you should check out leptosfmt, which is an excellent tool!) Perhaps you worry about the effect of macros on compile time. Perhaps you prefer the aesthetics of pure Rust syntax, or you have trouble context-switching between an HTML-like syntax and your Rust code. Or perhaps you want more flexibility in how you create and manipulate HTML elements than the view macro provides.
+
+If you fall into any of those camps, the builder syntax may be for you.
+
+The view macro expands an HTML-like syntax to a series of Rust functions and method calls. If you’d rather not use the view macro, you can simply use that expanded syntax yourself. And it’s actually pretty nice!
+
+First off, if you want you can even drop the #[component] macro: a component is just a setup function that creates your view, so you can define a component as a simple function call:
+
+pub fn counter(initial_value: i32, step: u32) -> impl IntoView { }
+Elements are created by calling a function with the same name as the HTML element:
+
+p()
+You can add children to the element with .child(), which takes a single child or a tuple or array of types that implement IntoView.
+
+p().child((em().child("Big, "), strong().child("bold "), "text"))
+Attributes are added with .attr(). This can take any of the same types that you could pass as an attribute into the view macro (types that implement IntoAttribute).
+
+p().attr("id", "foo").attr("data-count", move || count().to_string())
+Similarly, the class:, prop:, and style: syntaxes map directly onto .class(), .prop(), and .style() methods.
+
+Event listeners can be added with .on(). Typed events found in leptos::ev prevent typos in event names and allow for correct type inference in the callback function.
+
+button()
+    .on(ev::click, move |_| set_count.update(|count| *count = 0))
+    .child("Clear")
+Many additional methods can be found in the HtmlElement docs, including some methods that are not directly available in the view macro.
+
+All of this adds up to a very Rusty syntax to build full-featured views, if you prefer this style.
+
+/// A simple counter view.
+// A component is really just a function call: it runs once to create the DOM and reactive system
+pub fn counter(initial_value: i32, step: u32) -> impl IntoView {
+    let (count, set_count) = create_signal(0);
+    div().child((
+        button()
+            // typed events found in leptos::ev
+            // 1) prevent typos in event names
+            // 2) allow for correct type inference in callbacks
+            .on(ev::click, move |_| set_count.update(|count| *count = 0))
+            .child("Clear"),
+        button()
+            .on(ev::click, move |_| set_count.update(|count| *count -= 1))
+            .child("-1"),
+     

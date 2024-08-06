@@ -1,0 +1,413 @@
+ur computer to light on fire, but a derived signal or memo is always better—not only because the dataflow is clear, but because the performance is better.
+
+let (a, set_a) = create_signal(0);
+
+// ⚠️ not great
+let (b, set_b) = create_signal(0);
+create_effect(move |_| {
+    set_b(a() * 2);
+});
+
+// ✅ woo-hoo!
+let b = move || a() * 2;
+If you need to synchronize some reactive value with the non-reactive world outside—like a web API, the console, the filesystem, or the DOM—writing to a signal in an effect is a fine way to do that. In many cases, though, you’ll find that you’re really writing to a signal inside an event listener or something else, not inside an effect. In these cases, you should check out leptos-use to see if it already provides a reactive wrapping primitive to do that!
+
+If you’re curious for more information about when you should and shouldn’t use create_effect, check out this video for a more in-depth consideration!
+
+Effects and Rendering
+We’ve managed to get this far without mentioning effects because they’re built into the Leptos DOM renderer. We’ve seen that you can create a signal and pass it into the view macro, and it will update the relevant DOM node whenever the signal changes:
+
+let (count, set_count) = create_signal(0);
+
+view! {
+    <p>{count}</p>
+}
+This works because the framework essentially creates an effect wrapping this update. You can imagine Leptos translating this view into something like this:
+
+let (count, set_count) = create_signal(0);
+
+// create a DOM element
+let document = leptos::document();
+let p = document.create_element("p").unwrap();
+
+// create an effect to reactively update the text
+create_effect(move |prev_value| {
+    // first, access the signal’s value and convert it to a string
+    let text = count().to_string();
+
+    // if this is different from the previous value, update the node
+    if prev_value != Some(text) {
+        p.set_text_content(&text);
+    }
+
+    // return this value so we can memoize the next update
+    text
+});
+Every time count is updated, this effect will rerun. This is what allows reactive, fine-grained updates to the DOM.
+
+Explicit, Cancelable Tracking with watch
+In addition to create_effect, Leptos provides a watch function, which can be used for two main purposes:
+
+Separating tracking and responding to changes by explicitly passing in a set of values to track.
+Canceling tracking by calling a stop function.
+Like create_resource, watch takes a first argument, which is reactively tracked, and a second, which is not. Whenever a reactive value in its deps argument is changed, the callback is run. watch returns a function that can be called to stop tracking the dependencies.
+
+let (num, set_num) = create_signal(0);
+
+let stop = watch(
+    move || num.get(),
+    move |num, prev_num, _| {
+        log::debug!("Number: {}; Prev: {:?}", num, prev_num);
+    },
+    false,
+);
+
+set_num.set(1); // > "Number: 1; Prev: Some(0)"
+
+stop(); // stop watching
+
+set_num.set(2); // (nothing happens)
+
+other code
+
+use leptos::html::Input;
+use leptos::*;
+
+#[derive(Copy, Clone)]
+struct LogContext(RwSignal<Vec<String>>);
+
+#[component]
+fn App() -> impl IntoView {
+    // Just making a visible log here
+    // You can ignore this...
+    let log = create_rw_signal::<Vec<String>>(vec![]);
+    let logged = move || log().join("\n");
+
+    // the newtype pattern isn't *necessary* here but is a good practice
+    // it avoids confusion with other possible future `RwSignal<Vec<String>>` contexts
+    // and makes it easier to refer to it
+    provide_context(LogContext(log));
+
+    view! {
+        <CreateAnEffect/>
+        <pre>{logged}</pre>
+    }
+}
+
+#[component]
+fn CreateAnEffect() -> impl IntoView {
+    let (first, set_first) = create_signal(String::new());
+    let (last, set_last) = create_signal(String::new());
+    let (use_last, set_use_last) = create_signal(true);
+
+    // this will add the name to the log
+    // any time one of the source signals changes
+    create_effect(move |_| {
+        log(if use_last() {
+            with!(|first, last| format!("{first} {last}"))
+        } else {
+            first()
+        })
+    });
+
+    view! {
+        <h1>
+            <code>"create_effect"</code>
+            " Version"
+        </h1>
+        <form>
+            <label>
+                "First Name"
+                <input
+                    type="text"
+                    name="first"
+                    prop:value=first
+                    on:change=move |ev| set_first(event_target_value(&ev))
+                />
+            </label>
+            <label>
+                "Last Name"
+                <input
+                    type="text"
+                    name="last"
+                    prop:value=last
+                    on:change=move |ev| set_last(event_target_value(&ev))
+                />
+            </label>
+            <label>
+                "Show Last Name"
+                <input
+                    type="checkbox"
+                    name="use_last"
+                    prop:checked=use_last
+                    on:change=move |ev| set_use_last(event_target_checked(&ev))
+                />
+            </label>
+        </form>
+    }
+}
+
+#[component]
+fn ManualVersion() -> impl IntoView {
+    let first = create_node_ref::<Input>();
+    let last = create_node_ref::<Input>();
+    let use_last = create_node_ref::<Input>();
+
+    let mut prev_name = String::new();
+    let on_change = move |_| {
+        log("      listener");
+        let first = first.get().unwrap();
+        let last = last.get().unwrap();
+        let use_last = use_last.get().unwrap();
+        let this_one = if use_last.checked() {
+            format!("{} {}", first.value(), last.value())
+        } else {
+            first.value()
+        };
+
+        if this_one != prev_name {
+            log(&this_one);
+            prev_name = this_one;
+        }
+    };
+
+    view! {
+        <h1>"Manual Version"</h1>
+        <form on:change=on_change>
+            <label>"First Name" <input type="text" name="first" node_ref=first/></label>
+            <label>"Last Name" <input type="text" name="last" node_ref=last/></label>
+            <label>
+                "Show Last Name" <input type="checkbox" name="use_last" checked node_ref=use_last/>
+            </label>
+        </form>
+    }
+}
+
+#[component]
+fn EffectVsDerivedSignal() -> impl IntoView {
+    let (my_value, set_my_value) = create_signal(String::new());
+    // Don't do this.
+    /*let (my_optional_value, set_optional_my_value) = create_signal(Option::<String>::None);
+
+    create_effect(move |_| {
+        if !my_value.get().is_empty() {
+            set_optional_my_value(Some(my_value.get()));
+        } else {
+            set_optional_my_value(None);
+        }
+    });*/
+
+    // Do this
+    let my_optional_value =
+        move || (!my_value.with(String::is_empty)).then(|| Some(my_value.get()));
+
+    view! {
+        <input prop:value=my_value on:input=move |ev| set_my_value(event_target_value(&ev))/>
+
+        <p>
+            <code>"my_optional_value"</code>
+            " is "
+            <code>
+                <Show when=move || my_optional_value().is_some() fallback=|| view! { "None" }>
+                    "Some(\""
+                    {my_optional_value().unwrap()}
+                    "\")"
+                </Show>
+            </code>
+        </p>
+    }
+}
+
+#[component]
+pub fn Show<F, W, IV>(
+    /// The components Show wraps
+    children: Box<dyn Fn() -> Fragment>,
+    /// A closure that returns a bool that determines whether this thing runs
+    when: W,
+    /// A closure that returns what gets rendered if the when statement is false
+    fallback: F,
+) -> impl IntoView
+where
+    W: Fn() -> bool + 'static,
+    F: Fn() -> IV + 'static,
+    IV: IntoView,
+{
+    let memoized_when = create_memo(move |_| when());
+
+    move || match memoized_when.get() {
+        true => children().into_view(),
+        false => fallback().into_view(),
+    }
+}
+
+fn log(msg: impl std::fmt::Display) {
+    let log = use_context::<LogContext>().unwrap().0;
+    log.update(|log| log.push(msg.to_string()));
+}
+
+fn main() {
+    leptos::mount_to_body(App)
+}
+
+
+Interlude: Reactivity and Functions
+One of our core contributors said to me recently: “I never used closures this often until I started using Leptos.” And it’s true. Closures are at the heart of any Leptos application. It sometimes looks a little silly:
+
+// a signal holds a value, and can be updated
+let (count, set_count) = create_signal(0);
+
+// a derived signal is a function that accesses other signals
+let double_count = move || count() * 2;
+let count_is_odd = move || count() & 1 == 1;
+let text = move || if count_is_odd() {
+    "odd"
+} else {
+    "even"
+};
+
+// an effect automatically tracks the signals it depends on
+// and reruns when they change
+create_effect(move |_| {
+    logging::log!("text = {}", text());
+});
+
+view! {
+    <p>{move || text().to_uppercase()}</p>
+}
+Closures, closures everywhere!
+
+But why?
+
+Functions and UI Frameworks
+Functions are at the heart of every UI framework. And this makes perfect sense. Creating a user interface is basically divided into two phases:
+
+initial rendering
+updates
+In a web framework, the framework does some kind of initial rendering. Then it hands control back over to the browser. When certain events fire (like a mouse click) or asynchronous tasks finish (like an HTTP request finishing), the browser wakes the framework back up to update something. The framework runs some kind of code to update your user interface, and goes back asleep until the browser wakes it up again.
+
+The key phrase here is “runs some kind of code.” The natural way to “run some kind of code” at an arbitrary point in time—in Rust or in any other programming language—is to call a function. And in fact every UI framework is based on rerunning some kind of function over and over:
+
+virtual DOM (VDOM) frameworks like React, Yew, or Dioxus rerun a component or render function over and over, to generate a virtual DOM tree that can be reconciled with the previous result to patch the DOM
+compiled frameworks like Angular and Svelte divide your component templates into “create” and “update” functions, rerunning the update function when they detect a change to the component’s state
+in fine-grained reactive frameworks like SolidJS, Sycamore, or Leptos, you define the functions that rerun
+That’s what all our components are doing.
+
+Take our typical <SimpleCounter/> example in its simplest form:
+
+#[component]
+pub fn SimpleCounter() -> impl IntoView {
+    let (value, set_value) = create_signal(0);
+
+    let increment = move |_| set_value.update(|value| *value += 1);
+
+    view! {
+        <button on:click=increment>
+            {value}
+        </button>
+    }
+}
+The SimpleCounter function itself runs once. The value signal is created once. The framework hands off the increment function to the browser as an event listener. When you click the button, the browser calls increment, which updates value via set_value. And that updates the single text node represented in our view by {value}.
+
+Closures are key to reactivity. They provide the framework with the ability to rerun the smallest possible unit of your application in response to a change.
+
+So remember two things:
+
+Your component function is a setup function, not a render function: it only runs once.
+For values in your view template to be reactive, they must be functions: either signals (which implement the Fn traits) or closures.
+
+
+Testing Your Components
+Testing user interfaces can be relatively tricky, but really important. This article will discuss a couple principles and approaches for testing a Leptos app.
+
+1. Test business logic with ordinary Rust tests
+In many cases, it makes sense to pull the logic out of your components and test it separately. For some simple components, there’s no particular logic to test, but for many it’s worth using a testable wrapping type and implementing the logic in ordinary Rust impl blocks.
+
+For example, instead of embedding logic in a component directly like this:
+
+#[component]
+pub fn TodoApp() -> impl IntoView {
+    let (todos, set_todos) = create_signal(vec![Todo { /* ... */ }]);
+    // ⚠️ this is hard to test because it's embedded in the component
+    let num_remaining = move || todos.with(|todos| {
+        todos.iter().filter(|todo| !todo.completed).sum()
+    });
+}
+You could pull that logic out into a separate data structure and test it:
+
+pub struct Todos(Vec<Todo>);
+
+impl Todos {
+    pub fn num_remaining(&self) -> usize {
+        self.0.iter().filter(|todo| !todo.completed).sum()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_remaining() {
+        // ...
+    }
+}
+
+#[component]
+pub fn TodoApp() -> impl IntoView {
+    let (todos, set_todos) = create_signal(Todos(vec![Todo { /* ... */ }]));
+    // ✅ this has a test associated with it
+    let num_remaining = move || todos.with(Todos::num_remaining);
+}
+In general, the less of your logic is wrapped into your components themselves, the more idiomatic your code will feel and the easier it will be to test.
+
+2. Test components with end-to-end (e2e) testing
+Our examples directory has several examples with extensive end-to-end testing, using different testing tools.
+
+The easiest way to see how to use these is to take a look at the test examples themselves:
+
+wasm-bindgen-test with counter
+This is a fairly simple manual testing setup that uses the wasm-pack test command.
+
+Sample Test
+#[wasm_bindgen_test]
+fn clear() {
+    let document = leptos::document();
+    let test_wrapper = document.create_element("section").unwrap();
+    let _ = document.body().unwrap().append_child(&test_wrapper);
+
+    mount_to(
+        test_wrapper.clone().unchecked_into(),
+        || view! { <SimpleCounter initial_value=10 step=1/> },
+    );
+
+    let div = test_wrapper.query_selector("div").unwrap().unwrap();
+    let clear = test_wrapper
+        .query_selector("button")
+        .unwrap()
+        .unwrap()
+        .unchecked_into::<web_sys::HtmlElement>();
+
+    clear.click();
+
+assert_eq!(
+    div.outer_html(),
+    // here we spawn a mini reactive system to render the test case
+    run_scope(create_runtime(), || {
+        // it's as if we're creating it with a value of 0, right?
+        let (value, set_value) = create_signal(0);
+
+        // we can remove the event listeners because they're not rendered to HTML
+        view! {
+            <div>
+                <button>"Clear"</button>
+                <button>"-1"</button>
+                <span>"Value: " {value} "!"</span>
+                <button>"+1"</button>
+            </div>
+        }
+        // the view returned an HtmlElement<Div>, which is a smart pointer for
+        // a DOM element. So we can still just call .outer_html()
+        .outer_html()
+    })
+);
+}
+wasm-bindgen-test with counters_stable
+This mo

@@ -1,0 +1,230 @@
+bunch of features - if the required feature is already enabled here, you won't have to enable it in your own app. Otherwise, add it to your Cargo.toml and you’re good to go!
+
+[dependencies.web-sys]
+version = "0.3"
+features = ["DomRect"]
+However, as the JavaScript standard evolves and APIs are being written, you may want to use browser features that are technically not fully stable yet, such as WebGPU. web_sys will follow the (potentially frequently changing) standard, which means that no stability guarantees are made.
+
+In order to use this, you need to add RUSTFLAGS=--cfg=web_sys_unstable_apis as an environment variable. This can either be done by adding it to every command, or add it to .cargo/config.toml in your repository.
+
+As part of a command:
+
+RUSTFLAGS=--cfg=web_sys_unstable_apis cargo # ...
+In .cargo/config.toml:
+
+[env]
+RUSTFLAGS = "--cfg=web_sys_unstable_apis"
+Accessing raw HtmlElements from your view
+The declarative style of the framework means that you don’t need to directly manipulate DOM nodes to build up your user interface. However, in some cases you want direct access to the underlying DOM element that represents part of your view. The section of the book on “uncontrolled inputs” showed how to do this using the NodeRef type.
+
+You may notice that NodeRef::get returns an Option<leptos::HtmlElement<T>>. This is not the same type as a web_sys::HtmlElement, although they are related. So what is this HtmlElement<T> type, and how do you use it?
+
+Overview
+web_sys::HtmlElement is the Rust equivalent of the browser’s HTMLElement interface, which is implemented for all HTML elements. It provides access to a minimal set of functions and APIs that are guaranteed to be available for any HTML element. Each particular HTML element then has its own element class, which implements additional functionality. The goal of leptos::HtmlElement<T> is to bridge the gap between elements in your view and these more specific JavaScript types, so that you can access the particular functionality of those elements.
+
+This is implement by using the Rust Deref trait to allow you to dereference a leptos::HtmlElement<T> to the appropriately-typed JS object for that particular element type T.
+
+Definition
+Understanding this relationship involves understanding some related traits.
+
+The following simply defines what types are allowed inside the T of leptos::HtmlElement<T> and how it links to web_sys.
+
+pub struct HtmlElement<El> where El: ElementDescriptor { /* ... */ }
+
+pub trait ElementDescriptor: ElementDescriptorBounds { /* ... */ }
+
+pub trait ElementDescriptorBounds: Debug {}
+impl<El> ElementDescriptorBounds for El where El: Debug {}
+
+// this is implemented for every single element in `leptos::{html, svg, math}::*`
+impl ElementDescriptor for leptos::html::Div { /* ... */ }
+
+// same with this, derefs to the corresponding `web_sys::Html*Element`
+impl Deref for leptos::html::Div {
+    type Target = web_sys::HtmlDivElement;
+    // ...
+}
+The following is from web_sys:
+
+impl Deref for web_sys::HtmlDivElement {
+    type Target = web_sys::HtmlElement;
+    // ...
+}
+
+impl Deref for web_sys::HtmlElement {
+    type Target = web_sys::Element;
+    // ...
+}
+
+impl Deref for web_sys::Element {
+    type Target = web_sys::Node;
+    // ...
+}
+
+impl Deref for web_sys::Node {
+    type Target = web_sys::EventTarget;
+    // ...
+}
+web_sys uses long deref chains to emulate the inheritance used in JavaScript. If you can't find the method you're looking for on one type, take a look further down the deref chain. The leptos::html::* types all deref into web_sys::Html*Element or web_sys::HtmlElement. By calling element.method(), Rust will automatically add more derefs as needed to call the correct method!
+
+However, some methods have the same name, such as leptos::HtmlElement::style and web_sys::HtmlElement::style. In these cases, Rust will pick the one that requires the least amount of derefs, which is leptos::HtmlElement::style if you're getting an element straight from a NodeRef. If you wish to use the web_sys method instead, you can manually deref with (*element).style().
+
+If you want to have even more control over which type you are calling a method from, AsRef<T> is implemented for all types that are part of the deref chain, so you can explicitly state which type you want.
+
+See also: The wasm-bindgen Guide: Inheritance in web-sys.
+
+Clones
+The web_sys::HtmlElement (and by extension the leptos::HtmlElement too) actually only store references to the HTML element it affects. Therefore, calling .clone() doesn't actually make a new HTML element, it simply gets another reference to the same one. Calling methods that change the element from any of its clones will affect the original element.
+
+Unfortunately, web_sys::HtmlElement does not implement Copy, so you may need to add a bunch of clones especially when using it in closures. Don't worry though, these clones are cheap!
+
+Casting
+You can get less specific types through Deref or AsRef, so use those when possible. However, if you need to cast to a more specific type (e.g. from an EventTarget to a HtmlInputElement), you will need to use the methods provided by wasm_bindgen::JsCast (re-exported through web_sys::wasm_bindgen::JsCast). You'll probably only need the dyn_ref method.
+
+use web_sys::wasm_bindgen::JsCast;
+
+let on_click = |ev: MouseEvent| {
+    let target: HtmlInputElement = ev.current_target().unwrap().dyn_ref().unwrap();
+    // or, just use the existing `leptos::event_target_*` functions
+}
+See the event_target_* functions here, if you're curious.
+
+leptos::HtmlElement
+The leptos::HtmlElement adds some extra convenience methods to make it easier to manipulate common attributes. These methods were built for the builder syntax, so it takes and returns self. You can just do _ = element.clone().<method>() to ignore the element it returns - it'll still affect the original element, even though it doesn't look like it (see previous section on Clones)!
+
+Here are some of the common methods you may want to use, for example in event listeners or use: directives.
+
+id: overwrites the id on the element.
+classes: adds the classes to the element. You can specify multiple classes with a space-separated string. You can also use class to conditionally add a single class: do not add multiple with this method.
+attr: sets a key=value attribute to the element.
+prop: sets a property on the element: see the distinction between properties and attributes here.
+on: adds an event listener to the element. Specify the event type through one of leptos::ev::* (it's the ones in all lowercase).
+child: adds an element as the last child of the element.
+Take a look at the rest of the leptos::HtmlElement methods too. If none of them fit your requirements, also take a look at leptos-use. Otherwise, you’ll have to use the web_sys APIs.
+
+
+Wrapping Up Part 1: Client-Side Rendering
+So far, everything we’ve written has been rendered almost entirely in the browser. When we create an app using Trunk, it’s served using a local development server. If you build it for production and deploy it, it’s served by whatever server or CDN you’re using. In either case, what’s served is an HTML page with
+
+the URL of your Leptos app, which has been compiled to WebAssembly (WASM)
+the URL of the JavaScript used to initialize this WASM blob
+an empty <body> element
+When the JS and WASM have loaded, Leptos will render your app into the <body>. This means that nothing appears on the screen until JS/WASM have loaded and run. This has some drawbacks:
+
+It increases load time, as your user’s screen is blank until additional resources have been downloaded.
+It’s bad for SEO, as load times are longer and the HTML you serve has no meaningful content.
+It’s broken for users for whom JS/WASM don’t load for some reason (e.g., they’re on a train and just went into a tunnel before WASM finished loading; they’re using an older device that doesn’t support WASM; they have JavaScript or WASM turned off for some reason; etc.)
+These downsides apply across the web ecosystem, but especially to WASM apps.
+
+However, depending on the requirements of your project, you may be fine with these limitations.
+
+If you just want to deploy your Client-Side Rendered website, skip ahead to the chapter on "Deployment" - there, you'll find directions on how best to deploy your Leptos CSR site.
+
+But what do you do if you want to return more than just an empty <body> tag in your index.html page? Use “Server-Side Rendering”!
+
+Whole books could be (and probably have been) written about this topic, but at its core, it’s really simple: rather than returning an empty <body> tag, with SSR, you'll return an initial HTML page that reflects the actual starting state of your app or site, so that while JS/WASM are loading, and until they load, the user can access the plain HTML version.
+
+Part 2 of this book, on Leptos SSR, will cover this topic in some detail!
+
+
+Part 2: Server Side Rendering
+The second part of the book is all about how to turn your beautiful UIs into full-stack Rust + Leptos powered websites and applications.
+
+As you read in the last chapter, there are some limitations to using client-side rendered Leptos apps - over the next few chapters, you'll see how we can overcome those limitations and get the best performance and SEO out of your Leptos apps.
+
+Info
+
+When working with Leptos on the server side, you're free to choose either the Actix-web or the Axum integrations - the full feature set of Leptos is available with either option.
+
+If, however, you need deploy to a WinterCG-compatible runtime like Deno, Cloudflare, etc., then choose the Axum integration as this deployment option is only available with Axum on the server. Lastly, if you'd like to go full-stack WASM/WASI and deploy to WASM-based serverless runtimes, then Axum is your go-to choice here too.
+
+NB: this is a limitation of the web frameworks themselves, not Leptos.
+
+
+Introducing cargo-leptos
+So far, we’ve just been running code in the browser and using Trunk to coordinate the build process and run a local development process. If we’re going to add server-side rendering, we’ll need to run our application code on the server as well. This means we’ll need to build two separate binaries, one compiled to native code and running the server, the other compiled to WebAssembly (WASM) and running in the user’s browser. Additionally, the server needs to know how to serve this WASM version (and the JavaScript required to initialize it) to the browser.
+
+This is not an insurmountable task but it adds some complication. For convenience and an easier developer experience, we built the cargo-leptos build tool. cargo-leptos basically exists to coordinate the build process for your app, handling recompiling the server and client halves when you make changes, and adding some built-in support for things like Tailwind, SASS, and testing.
+
+Getting started is pretty easy. Just run
+
+cargo install cargo-leptos
+And then to create a new project, you can run either
+
+# for an Actix template
+cargo leptos new --git leptos-rs/start
+or
+
+# for an Axum template
+cargo leptos new --git leptos-rs/start-axum
+Now cd into the directory you’ve created and run
+
+cargo leptos watch
+Note: Remember that Leptos has a nightly feature, which each of these starters use. If you're using the stable Rust compiler, that’s fine; just remove the nightly feature from each of the Leptos dependencies in your new Cargo.toml and you should be all set.
+
+Once your app has compiled you can open up your browser to http://localhost:3000 to see it.
+
+cargo-leptos has lots of additional features and built in tools. You can learn more in its README.
+
+But what exactly is happening when you open our browser to localhost:3000? Well, read on to find out.
+
+deep
+
+Features
+Parallel build of server and client in watch mode for fast developer feedback.
+CSS hot-reload (no page-reload, only CSS updated).
+Build server and client for hydration (client-side rendering mode not supported).
+Support for both workspace and single-package setup.
+SCSS compilation using dart-sass.
+CSS transformation and minification using Lightning CSS.
+Builds server and client (wasm) binaries using Cargo.
+Generates JS - Wasm bindings with wasm-bindgen
+Includes support for JS Snippets for when you want to call some JS code from your WASM.
+Optimises the wasm with wasm-opt from Binaryen
+watch command for automatic rebuilds with browser live-reload.
+test command for running tests of the lib and bin packages that makes up the Leptos project.
+build build the server and client.
+end-to-end command for building, running the server and calling a bash shell hook. The hook would typically launch Playwright or similar.
+new command for creating a new project based on templates, using cargo-generate. Current templates include
+https://github.com/leptos-rs/start: An Actix starter
+https://github.com/leptos-rs/start-axum: An Axum starter
+https://github.com/leptos-rs/start-axum-workspace: An Axum starter keeping client and server code in separate crates in a workspace
+'no_downloads' feature to allow user management of optional dependencies
+Getting started
+Install:
+
+cargo install --locked cargo-leptos
+
+If you, for any reason, need the bleeding-edge super fresh version:
+
+cargo install --git https://github.com/leptos-rs/cargo-leptos --locked cargo-leptos
+
+Help:
+
+cargo leptos --help
+
+For setting up your project, have a look at the examples
+
+
+Dependencies
+The dependencies for sass, wasm-opt and cargo-generate are automatically installed in a cache directory when they are used if they are not already installed and found by which. Different versions of the dependencies might accumulate in this directory, so feel free to delete it.
+
+OS	Example
+Linux	/home/alice/.cache/cargo-leptos
+macOS	/Users/Alice/Library/Caches/cargo-leptos
+Windows	C:\Users\Alice\AppData\Local\cargo-leptos
+If you wish to make it mandatory to install your dependencies, or are using Nix or NixOs, you can install it with the no_downloads feature enabled to prevent cargo-leptos from trying to download and install them.
+
+cargo install --features no_downloads --locked cargo-leptos
+
+
+Single-package setup
+The single-package setup is where the code for both the frontend and the server is defined in a single package.
+
+Configuration parameters are defined in the package Cargo.toml section [package.metadata.leptos]. See the Parameters reference for a full list of parameters that can be used. All paths are relative to the package root (i.e. to the Cargo.toml file)
+
+
+Workspace setup
+When using a workspace setup both single-package and multi-package projects are supported. The latter is when the frontend and the server reside in different packages.
+
+All workspace members whose Cargo.toml define the [package.metadata.leptos] section are automatically included as Leptos single-package projects. The multi-package projects are defined on the workspace level in the Cargo.toml's section [[workspace.m

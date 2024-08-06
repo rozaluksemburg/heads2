@@ -1,0 +1,233 @@
+egrate your server functions with the rest of your applications:
+
+Create resources that call the server function to load data from the server
+Read these resources under <Suspense/> or <Transition/> to enable streaming SSR and fallback states while data loads.
+Create actions that call the server function to mutate data on the server
+The final section of this book will make this a little more concrete by introducing patterns that use progressively-enhanced HTML forms to run these server actions.
+
+But in the next few chapters, we’ll actually take a look at some of the details of what you might want to do with your server functions, including the best ways to integrate with the powerful extractors provided by the Actix and Axum server frameworks.
+
+
+Extractors
+The server functions we looked at in the last chapter showed how to run code on the server, and integrate it with the user interface you’re rendering in the browser. But they didn’t show you much about how to actually use your server to its full potential.
+
+Server Frameworks
+We call Leptos a “full-stack” framework, but “full-stack” is always a misnomer (after all, it never means everything from the browser to your power company.) For us, “full stack” means that your Leptos app can run in the browser, and can run on the server, and can integrate the two, drawing together the unique features available in each; as we’ve seen in the book so far, a button click on the browser can drive a database read on the server, both written in the same Rust module. But Leptos itself doesn’t provide the server (or the database, or the operating system, or the firmware, or the electrical cables...)
+
+Instead, Leptos provides integrations for the two most popular Rust web server frameworks, Actix Web (leptos_actix) and Axum (leptos_axum). We’ve built integrations with each server’s router so that you can simply plug your Leptos app into an existing server with .leptos_routes(), and easily handle server function calls.
+
+If you haven’t seen our Actix and Axum templates, now’s a good time to check them out.
+
+Using Extractors
+Both Actix and Axum handlers are built on the same powerful idea of extractors. Extractors “extract” typed data from an HTTP request, allowing you to access server-specific data easily.
+
+Leptos provides extract helper functions to let you use these extractors directly in your server functions, with a convenient syntax very similar to handlers for each framework.
+
+Actix Extractors
+The extract function in leptos_actix takes a handler function as its argument. The handler follows similar rules to an Actix handler: it is an async function that receives arguments that will be extracted from the request and returns some value. The handler function receives that extracted data as its arguments, and can do further async work on them inside the body of the async move block. It returns whatever value you return back out into the server function.
+
+use serde::Deserialize;
+
+#[derive(Deserialize, Debug)]
+struct MyQuery {
+    foo: String,
+}
+
+#[server]
+pub async fn actix_extract() -> Result<String, ServerFnError> {
+    use actix_web::dev::ConnectionInfo;
+    use actix_web::web::{Data, Query};
+    use leptos_actix::extract;
+
+    let (Query(search), connection): (Query<MyQuery>, ConnectionInfo) = extract().await?;
+    Ok(format!("search = {search:?}\nconnection = {connection:?}",))
+}
+Axum Extractors
+The syntax for the leptos_axum::extract function is very similar.
+
+use serde::Deserialize;
+
+#[derive(Deserialize, Debug)]
+struct MyQuery {
+    foo: String,
+}
+
+#[server]
+pub async fn axum_extract() -> Result<String, ServerFnError> {
+    use axum::{extract::Query, http::Method};
+    use leptos_axum::extract;
+
+    let (method, query): (Method, Query<MyQuery>) = extract().await?;
+
+    Ok(format!("{method:?} and {query:?}"))
+}
+These are relatively simple examples accessing basic data from the server. But you can use extractors to access things like headers, cookies, database connection pools, and more, using the exact same extract() pattern.
+
+The Axum extract function only supports extractors for which the state is (). If you need an extractor that uses State, you should use extract_with_state. This requires you to provide the state. You can do this by extending the existing LeptosOptions state using the Axum FromRef pattern, which providing the state as context during render and server functions with custom handlers.
+
+use axum::extract::FromRef;
+
+/// Derive FromRef to allow multiple items in state, using Axum’s
+/// SubStates pattern.
+#[derive(FromRef, Debug, Clone)]
+pub struct AppState{
+    pub leptos_options: LeptosOptions,
+    pub pool: SqlitePool
+}
+Click here for an example of providing context in custom handlers.
+
+Axum State
+Axum's typical pattern for dependency injection is to provide a State, which can then be extracted in your route handler. Leptos provides its own method of dependency injection via context. Context can often be used instead of State to provide shared server data (for example, a database connection pool).
+
+let connection_pool = /* some shared state here */;
+
+let app = Router::new()
+    .leptos_routes_with_context(
+        &app_state,
+        routes,
+        move || provide_context(connection_pool.clone()),
+        App,
+    )
+    // etc.
+This context can then be accessed with a simple use_context::<T>() inside your server functions.
+
+If you need to use State in a server function—for example, if you have an existing Axum extractor that requires State, that is also possible using Axum's FromRef pattern and extract_with_state. Essentially you'll need to provide the state both via context and via Axum router state:
+
+#[derive(FromRef, Debug, Clone)]
+pub struct MyData {
+    pub value: usize,
+    pub leptos_options: LeptosOptions,
+}
+
+let app_state = MyData {
+    value: 42,
+    leptos_options,
+};
+
+// build our application with a route
+let app = Router::new()
+    .leptos_routes_with_context(
+        &app_state,
+        routes,
+        {
+            let app_state = app_state.clone();
+            move || provide_context(app_state.clone());
+        },
+        App,
+    )
+    .fallback(file_and_error_handler)
+    .with_state(app_state);
+
+// ... 
+#[server] 
+pub async fn uses_state() -> Result<(), ServerFnError> {
+    let state = expect_context::<AppState>();
+    let SomeStateExtractor(data) = extract_with_state(&state).await?;
+    // todo
+}
+A Note about Data-Loading Patterns
+Because Actix and (especially) Axum are built on the idea of a single round-trip HTTP request and response, you typically run extractors near the “top” of your application (i.e., before you start rendering) and use the extracted data to determine how that should be rendered. Before you render a <button>, you load all the data your app could need. And any given route handler needs to know all the data that will need to be extracted by that route.
+
+But Leptos integrates both the client and the server, and it’s important to be able to refresh small pieces of your UI with new data from the server without forcing a full reload of all the data. So Leptos likes to push data loading “down” in your application, as far towards the leaves of your user interface as possible. When you click a <button>, it can refresh just the data it needs. This is exactly what server functions are for: they give you granular access to data to be loaded and reloaded.
+
+The extract() functions let you combine both models by using extractors in your server functions. You get access to the full power of route extractors, while decentralizing knowledge of what needs to be extracted down to your individual components. This makes it easier to refactor and reorganize routes: you don’t need to specify all the data a route needs up front.
+
+
+Responses and Redirects
+Extractors provide an easy way to access request data inside server functions. Leptos also provides a way to modify the HTTP response, using the ResponseOptions type (see docs for Actix or Axum) types and the redirect helper function (see docs for Actix or Axum).
+
+ResponseOptions
+ResponseOptions is provided via context during the initial server rendering response and during any subsequent server function call. It allows you to easily set the status code for the HTTP response, or to add headers to the HTTP response, e.g., to set cookies.
+
+#[server(TeaAndCookies)]
+pub async fn tea_and_cookies() -> Result<(), ServerFnError> {
+    use actix_web::{cookie::Cookie, http::header, http::header::HeaderValue};
+    use leptos_actix::ResponseOptions;
+
+    // pull ResponseOptions from context
+    let response = expect_context::<ResponseOptions>();
+
+    // set the HTTP status code
+    response.set_status(StatusCode::IM_A_TEAPOT);
+
+    // set a cookie in the HTTP response
+    let mut cookie = Cookie::build("biscuits", "yes").finish();
+    if let Ok(cookie) = HeaderValue::from_str(&cookie.to_string()) {
+        response.insert_header(header::SET_COOKIE, cookie);
+    }
+}
+redirect
+One common modification to an HTTP response is to redirect to another page. The Actix and Axum integrations provide a redirect function to make this easy to do. redirect simply sets an HTTP status code of 302 Found and sets the Location header.
+
+Here’s a simplified example from our session_auth_axum example.
+
+#[server(Login, "/api")]
+pub async fn login(
+    username: String,
+    password: String,
+    remember: Option<String>,
+) -> Result<(), ServerFnError> {
+    // pull the DB pool and auth provider from context
+    let pool = pool()?;
+    let auth = auth()?;
+
+    // check whether the user exists
+    let user: User = User::get_from_username(username, &pool)
+        .await
+        .ok_or_else(|| {
+            ServerFnError::ServerError("User does not exist.".into())
+        })?;
+
+    // check whether the user has provided the correct password
+    match verify(password, &user.password)? {
+        // if the password is correct...
+        true => {
+            // log the user in
+            auth.login_user(user.id);
+            auth.remember_user(remember.is_some());
+
+            // and redirect to the home page
+            leptos_axum::redirect("/");
+            Ok(())
+        }
+        // if not, return an error
+        false => Err(ServerFnError::ServerError(
+            "Password does not match.".to_string(),
+        )),
+    }
+}
+This server function can then be used from your application. This redirect works well with the progressively-enhanced <ActionForm/> component: without JS/WASM, the server response will redirect because of the status code and header. With JS/WASM, the <ActionForm/> will detect the redirect in the server function response, and use client-side navigation to redirect to the new page.
+
+
+Progressive Enhancement (and Graceful Degradation)
+I’ve been driving around Boston for about fifteen years. If you don’t know Boston, let me tell you: Massachusetts has some of the most aggressive drivers(and pedestrians!) in the world. I’ve learned to practice what’s sometimes called “defensive driving”: assuming that someone’s about to swerve in front of you at an intersection when you have the right of way, preparing for a pedestrian to cross into the street at any moment, and driving accordingly.
+
+“Progressive enhancement” is the “defensive driving” of web design. Or really, that’s “graceful degradation,” although they’re two sides of the same coin, or the same process, from two different directions.
+
+Progressive enhancement, in this context, means beginning with a simple HTML site or application that works for any user who arrives at your page, and gradually enhancing it with layers of additional features: CSS for styling, JavaScript for interactivity, WebAssembly for Rust-powered interactivity; using particular Web APIs for a richer experience if they’re available and as needed.
+
+Graceful degradation means handling failure gracefully when parts of that stack of enhancement aren’t available. Here are some sources of failure your users might encounter in your app:
+
+Their browser doesn’t support WebAssembly because it needs to be updated.
+Their browser can’t support WebAssembly because browser updates are limited to newer OS versions, which can’t be installed on the device. (Looking at you, Apple.)
+They have WASM turned off for security or privacy reasons.
+They have JavaScript turned off for security or privacy reasons.
+JavaScript isn’t supported on their device (for example, some accessibility devices only support HTML browsing)
+The JavaScript (or WASM) never arrived at their device because they walked outside and lost WiFi.
+They stepped onto a subway car after loading the initial page and subsequent navigations can’t load data.
+... and so on.
+How much of your app still works if one of these holds true? Two of them? Three?
+
+If the answer is something like “95%... okay, then 90%... okay, then 75%,” that’s graceful degradation. If the answer is “my app shows a blank screen unless everything works correctly,” that’s... rapid unscheduled disassembly.
+
+Graceful degradation is especially important for WASM apps, because WASM is the newest and least-likely-to-be-supported of the four languages that run in the browser (HTML, CSS, JS, WASM).
+
+Luckily, we’ve got some tools to help.
+
+Defensive Design
+There are a few practices that can help your apps degrade more gracefully:
+
+Server-side rendering. Without SSR, your app simply doesn’t work without both JS and WASM loading. In some cases this may be appropriate (think internal apps gated behind a login) but in others it’s simply broken.
+Native HTML elements. Use HTML elements that do the things that you want, without additional code: <a> for navigation (including to hashes within the page), <details> for an accordion, <form> to persist information in the URL, etc.
+URL-driven state. The more of your global state is stored in the URL (as a route param or part of the query string), the more of the page can be generated during server rendering and updated by an <a> or a <form>, which means that not only navigations but state changes can work without JS/WASM.
+SsrMode::PartiallyBlocked or SsrMode::InOrder. Out-of-order streaming requires a small amount of inline JS, but can fail if 1) the connection is broken halfway through the response or 2) the client’s device doesn’t support JS. Async streaming will give a complete HTML page, but only after all resources load. In-order streaming begins showing pieces of the page sooner, in top-down order. “Partially-blocked” SSR builds on out-of-order streaming by replacing <Suspense/> fragments that read from blocking resources on the server. This adds marginally to the initial response time (because of the O(n) string replacement work), in exchange for a more complete initial HTML response. This can be a good choice for situations in which there’s a clear distinction between “more important” and “less important” content, e.g., blog post vs. c

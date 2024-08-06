@@ -1,0 +1,396 @@
+omments, or product info vs. reviews. If you choose to block on all the content, you’ve essentially recreated async rendering.
+Leaning on <form>s. There’s been a bit of a <form> renaissance recently, and it’s no surprise. The ability of a <form> to manage complicated POST or GET requests in an easily-enhanced way makes it a powerful tool for graceful degradation. The example in the <Form/> chapter, for example, would work fine with no JS/WASM: because it uses a <form method="GET"> to persist state in the URL, it works with pure HTML by making normal HTTP requests and then progressively enhances to use client-side navigations instead.
+There’s one final feature of the framework that we haven’t seen yet, and which builds on this characteristic of forms to build powerful applications: the <ActionForm/>.
+
+
+<ActionForm/>
+<ActionForm/> is a specialized <Form/> that takes a server action, and automatically dispatches it on form submission. This allows you to call a server function directly from a <form>, even without JS/WASM.
+
+The process is simple:
+
+Define a server function using the #[server] macro (see Server Functions.)
+Create an action using create_server_action, specifying the type of the server function you’ve defined.
+Create an <ActionForm/>, providing the server action in the action prop.
+Pass the named arguments to the server function as form fields with the same names.
+Note: <ActionForm/> only works with the default URL-encoded POST encoding for server functions, to ensure graceful degradation/correct behavior as an HTML form.
+
+#[server(AddTodo, "/api")]
+pub async fn add_todo(title: String) -> Result<(), ServerFnError> {
+    todo!()
+}
+
+#[component]
+fn AddTodo() -> impl IntoView {
+    let add_todo = create_server_action::<AddTodo>();
+    // holds the latest *returned* value from the server
+    let value = add_todo.value();
+    // check if the server has returned an error
+    let has_error = move || value.with(|val| matches!(val, Some(Err(_))));
+
+    view! {
+        <ActionForm action=add_todo>
+            <label>
+                "Add a Todo"
+                // `title` matches the `title` argument to `add_todo`
+                <input type="text" name="title"/>
+            </label>
+            <input type="submit" value="Add"/>
+        </ActionForm>
+    }
+}
+It’s really that easy. With JS/WASM, your form will submit without a page reload, storing its most recent submission in the .input() signal of the action, its pending status in .pending(), and so on. (See the Action docs for a refresher, if you need.) Without JS/WASM, your form will submit with a page reload. If you call a redirect function (from leptos_axum or leptos_actix) it will redirect to the correct page. By default, it will redirect back to the page you’re currently on. The power of HTML, HTTP, and isomorphic rendering mean that your <ActionForm/> simply works, even with no JS/WASM.
+
+Client-Side Validation
+Because the <ActionForm/> is just a <form>, it fires a submit event. You can use either HTML validation, or your own client-side validation logic in an on:submit. Just call ev.prevent_default() to prevent submission.
+
+The FromFormData trait can be helpful here, for attempting to parse your server function’s data type from the submitted form.
+
+let on_submit = move |ev| {
+    let data = AddTodo::from_event(&ev);
+    // silly example of validation: if the todo is "nope!", nope it
+    if data.is_err() || data.unwrap().title == "nope!" {
+        // ev.prevent_default() will prevent form submission
+        ev.prevent_default();
+    }
+}
+Complex Inputs
+Server function arguments that are structs with nested serializable fields should make use of indexing notation of serde_qs.
+
+use leptos::*;
+use leptos_router::*;
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct HeftyData {
+    first_name: String,
+    last_name: String,
+}
+
+#[component]
+fn ComplexInput() -> impl IntoView {
+    let submit = Action::<VeryImportantFn, _>::server();
+
+    view! {
+      <ActionForm action=submit>
+        <input type="text" name="hefty_arg[first_name]" value="leptos"/>
+        <input
+          type="text"
+          name="hefty_arg[last_name]"
+          value="closures-everywhere"
+        />
+        <input type="submit"/>
+      </ActionForm>
+    }
+}
+
+#[server]
+async fn very_important_fn(
+    hefty_arg: HeftyData,
+) -> Result<(), ServerFnError> {
+    assert_eq!(hefty_arg.first_name.as_str(), "leptos");
+    assert_eq!(hefty_arg.last_name.as_str(), "closures-everywhere");
+    Ok(())
+}
+
+
+Deployment
+There are as many ways to deploy a web application as there are developers, let alone applications. But there are a couple useful tips to keep in mind when deploying an app.
+
+General Advice
+Remember: Always deploy Rust apps built in --release mode, not debug mode. This has a huge effect on both performance and binary size.
+Test locally in release mode as well. The framework applies certain optimizations in release mode that it does not apply in debug mode, so it’s possible for bugs to surface at this point. (If your app behaves differently or you do encounter a bug, it’s likely a framework-level bug and you should open a GitHub issue with a reproduction.)
+See the chapter on "Optimizing WASM Binary Size" for additional tips and tricks to further improve the time-to-interactive metric for your WASM app on first load.
+We asked users to submit their deployment setups to help with this chapter. 
+
+
+Deploying a Client-Side-Rendered App
+If you’ve been building an app that only uses client-side rendering, working with Trunk as a dev server and build tool, the process is quite easy.
+
+trunk build --release
+trunk build will create a number of build artifacts in a dist/ directory. Publishing dist somewhere online should be all you need to deploy your app. This should work very similarly to deploying any JavaScript application.
+
+We've created several example repositories which show how to set up and deploy a Leptos CSR app to various hosting services.
+
+Note: Leptos does not endorse the use of any particular hosting service - feel free to use any service that supports static site deploys.
+
+Examples:
+
+Github Pages
+Vercel
+Spin (serverless WebAssembly)
+Github Pages
+Deploying a Leptos CSR app to Github pages is a simple affair. First, go to your Github repo's settings and click on "Pages" in the left side menu. In the "Build and deployment" section of the page, change the "source" to "Github Actions". Then copy the following into a file such as .github/workflows/gh-pages-deploy.yml
+
+Example
+
+name: Release to Github Pages
+
+on:
+push:
+    branches: [main]
+workflow_dispatch:
+
+permissions:
+contents: write # for committing to gh-pages branch.
+pages: write
+id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+group: "pages"
+cancel-in-progress: false
+
+jobs:
+Github-Pages-Release:
+
+    timeout-minutes: 10
+
+    environment:
+    name: github-pages
+    url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4 # repo checkout
+
+    # Install Rust Nightly Toolchain, with Clippy & Rustfmt
+    - name: Install nightly Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+        components: clippy, rustfmt
+
+    - name: Add WASM target
+        run: rustup target add wasm32-unknown-unknown
+
+    - name: lint
+        run: cargo clippy & cargo fmt
+
+
+    # If using tailwind...
+    # - name: Download and install tailwindcss binary
+    #   run: npm install -D tailwindcss && npx tailwindcss -i <INPUT/PATH.css> -o <OUTPUT/PATH.css>  # run tailwind
+
+
+    - name: Download and install Trunk binary
+        run: wget -qO- https://github.com/trunk-rs/trunk/releases/download/v0.18.2/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+
+    - name: Build with Trunk
+        # "${GITHUB_REPOSITORY#*/}" evaluates into the name of the repository
+        # using --public-url something will allow trunk to modify all the href paths like from favicon.ico to repo_name/favicon.ico .
+        # this is necessary for github pages where the site is deployed to username.github.io/repo_name and all files must be requested
+        # relatively as favicon.ico. if we skip public-url option, the href paths will instead request username.github.io/favicon.ico which
+        # will obviously return error 404 not found.
+        run: ./trunk build --release --public-url "${GITHUB_REPOSITORY#*/}"
+
+
+    # Deploy to gh-pages branch
+    # - name: Deploy 🚀
+    #   uses: JamesIves/github-pages-deploy-action@v4
+    #   with:
+    #     folder: dist
+
+
+    # Deploy with Github Static Pages
+
+    - name: Setup Pages
+        uses: actions/configure-pages@v4
+        with:
+        enablement: true
+        # token:
+
+    - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+        # Upload dist dir
+        path: './dist'
+
+    - name: Deploy to GitHub Pages 🚀
+        id: deployment
+        uses: actions/deploy-pages@v3
+For more on deploying to Github Pages see the example repo here
+
+Vercel
+Step 1: Set Up Vercel
+In the Vercel Web UI...
+
+Create a new project
+Ensure
+The "Build Command" is left empty with Override on
+The "Output Directory" is changed to dist (which is the default output directory for Trunk builds) and the Override is on
+
+Step 2: Add Vercel Credentials for GitHub Actions
+Note: Both the preview and deploy actions will need your Vercel credentials setup in GitHub secrets
+
+Retrieve your Vercel Access Token by going to "Account Settings" > "Tokens" and creating a new token - save the token to use in sub-step 5, below.
+
+Install the Vercel CLI using the npm i -g vercel command, then run vercel login to login to your acccount.
+
+Inside your folder, run vercel link to create a new Vercel project; in the CLI, you will be asked to 'Link to an existing project?' - answer yes, then enter the name you created in step 1. A new .vercel folder will be created for you.
+
+Inside the generated .vercel folder, open the the project.json file and save the "projectId" and "orgId" for the next step.
+
+Inside GitHub, go the repo's "Settings" > "Secrets and Variables" > "Actions" and add the following as Repository secrets:
+
+save your Vercel Access Token (from sub-step 1) as the VERCEL_TOKEN secret
+from the .vercel/project.json add "projectID" as VERCEL_PROJECT_ID
+from the .vercel/project.json add "orgId" as VERCEL_ORG_ID
+For full instructions see "How can I use Github Actions with Vercel"
+
+Step 3: Add Github Action Scripts
+Finally, you're ready to simply copy and paste the two files - one for deployment, one for PR previews - from below or from the example repo's .github/workflows/ folder into your own github workflows folder - then, on your next commit or PR deploys will occur automatically.
+
+Production deployment script: vercel_deploy.yml
+
+Example
+
+name: Release to Vercel
+
+on:
+push:
+    branches:
+    - main
+env:
+CARGO_TERM_COLOR: always
+VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+Vercel-Production-Deployment:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+    - name: git-checkout
+        uses: actions/checkout@v3
+
+    - uses: dtolnay/rust-toolchain@nightly
+        with:
+        components: clippy, rustfmt
+    - uses: Swatinem/rust-cache@v2
+    - name: Setup Rust
+        run: |
+        rustup target add wasm32-unknown-unknown
+        cargo clippy
+        cargo fmt --check
+
+    - name: Download and install Trunk binary
+        run: wget -qO- https://github.com/trunk-rs/trunk/releases/download/v0.18.2/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+
+
+    - name: Build with Trunk
+        run: ./trunk build --release
+
+    - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+    - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+    - name: Deploy to Vercel & Display URL
+        id: deployment
+        working-directory: ./dist
+        run: |
+        vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} >> $GITHUB_STEP_SUMMARY
+        echo $GITHUB_STEP_SUMMARY
+Preview deployments script: vercel_preview.yml
+
+Example
+
+# For more info re: vercel action see:
+# https://github.com/amondnet/vercel-action
+
+name: Leptos CSR Vercel Preview
+
+on:
+pull_request:
+    branches: [ "main" ]
+
+workflow_dispatch:
+
+env:
+CARGO_TERM_COLOR: always
+VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@nightly
+        with:
+        components: rustfmt
+    - name: Enforce formatting
+        run: cargo fmt --check
+
+clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@nightly
+        with:
+        components: clippy
+    - uses: Swatinem/rust-cache@v2
+    - name: Linting
+        run: cargo clippy -- -D warnings
+
+test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: [fmt, clippy]
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@nightly
+    - uses: Swatinem/rust-cache@v2
+    - name: Run tests
+        run: cargo test
+
+build-and-preview-deploy:
+    runs-on: ubuntu-latest
+    name: Build and Preview
+
+    needs: [test, clippy, fmt]
+
+    permissions:
+    pull-requests: write
+
+    environment:
+    name: preview
+    url: ${{ steps.preview.outputs.preview-url }}
+
+    steps:
+    - name: git-checkout
+        uses: actions/checkout@v4
+
+    - uses: dtolnay/rust-toolchain@nightly
+    - uses: Swatinem/rust-cache@v2
+    - name: Build
+        run: rustup target add wasm32-unknown-unknown
+
+    - name: Download and install Trunk binary
+        run: wget -qO- https://github.com/trunk-rs/trunk/releases/download/v0.18.2/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+
+
+    - name: Build with Trunk
+        run: ./trunk build --release
+
+    - name: Preview Deploy
+        id: preview
+        uses: amondnet/vercel-action@v25.1.1
+        with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        github-comment: true
+        working-directory: ./dist
+
+    - name: Display Deployed URL
+        run: |
+        echo "Deployed app URL: ${{ steps.preview.outputs.preview-url }}" >> $GITHUB_STEP_SUMMARY
+See the example repo here for more.
+
+Spin - Serverless WebAssembly
+Another option is using a serverless platform such as Spin. Although Spin is open source and you can

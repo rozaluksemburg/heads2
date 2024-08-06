@@ -1,0 +1,668 @@
+Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+
+
+                                       Headlines
+Refactoring UI: Font Recommendations
+
+
+
+
+HEADLINE PROXIMA BOLD 48PX   SUBTITLE PROXIMA NOVA REGULAR 24PX   BUTTON PROXIMA NOVA BOLD 20PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                16 STYLES
+COMMERCIAL (PAID)                      8 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+FONTS.COM
+FONTSHOP
+MY FONTS
+
+DESIGNED BY
+MARK SIMONSON
+
+PUBLISHED BY
+MARK SIMONSON STUDIO
+Refactoring UI: Font Recommendations
+
+
+
+
+HEADLINE FREIGHT SANS BOLD 48PX   SUBTITLE PROXIMA NOVA REGULAR 24PX   BUTTON PROXIMA NOVA BOLD 20PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                12 STYLES
+COMMERCIAL (PAID)                      6 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+FONTS.COM
+MY FONTS
+
+DESIGNED BY
+JOSHUA DARDEN
+
+
+PUBLISHED BY
+GARAGE FONTS
+Refactoring UI: Font Recommendations
+
+
+
+
+HEADLINE FUTURA BOLD 36PX   SUBTITLE TRADE GOTHIC NEXT REGULAR 24PX   BUTTON TRADE GOTHIC NEXT BOLD 20PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                12 STYLES
+COMMERCIAL (PAID)                      6 WEIGHTS WITH ITALICS
+
+
+AVAILABLE FROM
+ADOBE FONTS
+FONTS.COM
+FONTSHOP
+MY FONTS
+
+DESIGNED BY
+PAUL RENNER
+
+PUBLISHED BY
+LINOTYPE
+Refactoring UI: Font Recommendations
+
+
+
+
+HEADLINE HARMONIA SANS BLACK 48PX   SUBTITLE GRAPHIK REGULAR 24PX   BUTTON GRAPHIK SEMIBOLD 20PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                10 STYLES
+COMMERCIAL (PAID)                      5 WEIGHTS WITH ITALICS
+
+
+AVAILABLE FROM
+FONTS.COM
+MY FONTS
+
+
+DESIGNED BY
+JIM WASCO
+
+
+PUBLISHED BY
+MONOTYPE
+Refactoring UI: Font Recommendations
+
+
+
+
+HEADLINE GRAPHIK BLACK 48PX   SUBTITLE GRAPHIK REGULAR 24PX   BUTTON GRAPHIK SEMIBOLD 18PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                18 STYLES
+COMMERCIAL (PAID)                      9 WEIGHTS WITH ITALICS
+
+
+AVAILABLE FROM
+COMMERCIAL TYPE
+
+DESIGNED BY
+CHRISTIAN SCHWARTZ
+
+PUBLISHED BY
+COMMERCIAL TYPE
+Refactoring UI: Font Recommendations
+
+
+
+
+HEADLINE META SERIF BOLD 48PX   SUBTITLE MYRIAD PRO REGULAR 24PX   BUTTON MYRIAD PRO SEMIBOLD 20PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                12 STYLES
+COMMERCIAL (PAID)                      6 WEIGHTS WITH ITALICS
+
+
+AVAILABLE FROM
+ADOBE FONTS
+FONTS.COM
+FONTSHOP
+MY FONTS
+
+DESIGNED BY
+ERIK SPIEKERMANN
+CHRISTIAN SCHWARTZ
+KRIS SOWERSBY
+RALPH DU CARROIS
+BOTIO NIKOLTCHEV
+
+PUBLISHED BY
+FONTFONT
+Refactoring UI: Font Recommendations
+
+
+
+
+HEADLINE ROBOTO BLACK 48PX   SUBTITLE ROBOTO REGULAR 24PX   BUTTON ROBOTO BOLD 20PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                12 STYLES
+APACHE LICENSE, VERSION 2.0 (FREE)     6 WEIGHTS WITH ITALICS
+
+
+AVAILABLE FROM
+ADOBE FONTS
+GOOGLE FONTS
+
+
+DESIGNED BY
+CHRISTIAN ROBERTSON
+
+
+PUBLISHED BY
+FONTFONT
+Refactoring UI: Font Recommendations
+
+
+
+
+HEADLINE JUBILAT SEMIBOLD 48PX   SUBTITLE PROXIMA NOVA REGULAR 24PX   BUTTON PROXIMA NOVA BOLD 20PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                24 STYLES
+COMMERCIAL (PAID)                      12 WEIGHTS WITH ITALICS
+
+
+AVAILABLE FROM
+ADOBE FONTS
+
+PUBLISHED BY
+DARDEN STUDIO
+Refactoring UI: Font Recommendations
+
+
+
+
+HEADLINE INTERSTATE BOLD 48PX   SUBTITLE INTERSTATE LIGHT 24PX   BUTTON INTERSTATE REGULAR 20PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                16 STYLES
+COMMERCIAL (PAID)                      8 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+TYPENETWORK
+
+
+PUBLISHED BY
+FONT BUREAU
+Refactoring UI: Font Recommendations
+
+
+
+
+HEADLINE NEUE PLAK EXTRA BLACK 48PX   SUBTITLE NEUE PLAK REGULAR 24PX   BUTTON NEUE PLAK BOLD 20PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                7 STYLES
+COMMERCIAL (PAID)                      7 WEIGHTS
+
+
+AVAILABLE FROM
+FONTS.COM
+MY FONTS
+FONT SHOP
+
+DESIGNED BY
+LINDA HINTZ
+PAUL RENNER
+TOSHI OMAGARI
+
+PUBLISHED BY
+MONOTYPE
+Refactoring UI: Font Recommendations
+
+
+
+
+HEADLINE ADELLE EXTRA BOLD 48PX   SUBTITLE PROXIMA NOVA REGULAR 24PX   BUTTON PROXIMA NOVA BOLD 20PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                7 STYLES
+COMMERCIAL (PAID)                      7 WEIGHTS
+
+
+AVAILABLE FROM
+ADOBE FONTS
+
+DESIGNED BY
+JOSÉ SCAGLIONE
+VERONIKA BURIAN
+
+PUBLISHED BY
+TYPETOGETHER
+Refactoring UI: Font Recommendations
+
+
+
+
+                                       Articles
+Refactoring UI: Font Recommendations
+
+
+
+
+ARTICLE BODY FREIGHT TEXT BOOK 18PX   TITLE FREIGHT SANS BOOK 48PX   META FREIGHT SANS BOOK 16PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                12 STYLES
+COMMERCIAL (PAID)                      6 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+FONTS.COM
+MY FONTS
+
+DESIGNED BY
+JOSHUA DARDEN
+
+
+PUBLISHED BY
+GARAGE FONTS
+Refactoring UI: Font Recommendations
+
+
+
+
+ARTICLE BODY SOURCE SANS REGULAR 18PX   TITLE SOURCE SANS LIGHT 48PX   META SOURCE SANS REGULAR 16PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                12 STYLES
+OPEN FONT LICENSE (FREE)               6 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+MY FONTS
+
+
+DESIGNED BY
+PAUL D. HUNT
+
+
+PUBLISHED BY
+ADOBE
+Refactoring UI: Font Recommendations
+
+
+
+
+ARTICLE BODY SOURCE SANS REGULAR 18PX   TITLE SOURCE SANS LIGHT 48PX   META SOURCE SANS REGULAR 16PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                10 STYLES
+APACHE LICENSE, VERSION 2.0 (FREE)     5 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+GOOGLE FONTS
+
+
+DESIGNED BY
+STEVE MATTESON
+
+
+PUBLISHED BY
+GOOGLE
+Refactoring UI: Font Recommendations
+
+
+
+
+ARTICLE BODY MERRIWEATHER LIGHT 16PX   TITLE MERRIWEATHER SANS 16PX   META MERRIWEATHER SANS 14PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                8 STYLES
+OPEN FONT LICENSE (FREE)               4 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+GOOGLE FONTS
+
+
+DESIGNED BY
+EBEN SORKIN
+
+
+PUBLISHED BY
+SORKIN TYPE CO.
+Refactoring UI: Font Recommendations
+
+
+
+
+ARTICLE BODY PROXIMA NOVA REGULAR 18PX   TITLE FREIGHT SANS BOLD 48PX   META PROXIMA NOVA REGULAR 16PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                16 STYLES
+COMMERCIAL (PAID)                      8 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+FONTS.COM
+FONTSHOP
+MY FONTS
+
+DESIGNED BY
+MARK SIMONSON
+
+PUBLISHED BY
+MARK SIMONSON STUDIO
+Refactoring UI: Font Recommendations
+
+
+
+
+ARTICLE BODY FRANKLIN GOTHIC BOOK 18PX   TITLE FRANKLIN GOTHIC DEMI 48PX   META FRANKLIN GOTHIC BOOK 16PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                10 STYLES
+COMMERCIAL (PAID)                      5 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+FONTS.COM
+MY FONTS
+Refactoring UI: Font Recommendations
+
+
+
+
+ARTICLE BODY CAMPHOR REGULAR 18PX   TITLE CAMPHOR LIGHT 48PX   META CAMPHOR REGULAR 16PX
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                10 STYLES
+COMMERCIAL (PAID)                      5 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+FONTS.COM
+MY FONTS
+FONT SHOP
+
+DESIGNED BY
+NICK JOB
+
+PUBLISHED BY
+MONOTYPE
+Refactoring UI: Font Recommendations
+
+
+
+
+                                Application UI
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                16 STYLES
+COMMERCIAL (PAID)                      8 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+FONTS.COM
+FONTSHOP
+MY FONTS
+
+DESIGNED BY
+MARK SIMONSON
+
+PUBLISHED BY
+MARK SIMONSON STUDIO
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                12 STYLES
+SIL OPEN FONT LICENSE 1.1 (FREE)       12 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+RSMS.ME
+
+DESIGNED BY
+RASMUS ANDERSSON
+
+PUBLISHED BY
+RASMUS ANDERSSON
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                12 STYLES
+APACHE LICENSE, VERSION 2.0 (FREE)     6 WEIGHTS WITH ITALICS
+
+
+AVAILABLE FROM
+ADOBE FONTS
+GOOGLE FONTS
+
+
+DESIGNED BY
+CHRISTIAN ROBERTSON
+
+
+PUBLISHED BY
+FONTFONT
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                18 STYLES
+COMMERCIAL (PAID)                      9 WEIGHTS WITH ITALICS
+
+
+AVAILABLE FROM
+COMMERCIAL TYPE
+
+DESIGNED BY
+CHRISTIAN SCHWARTZ
+
+PUBLISHED BY
+COMMERCIAL TYPE
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                12 STYLES
+OPEN FONT LICENSE (FREE)               6 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+MY FONTS
+
+
+DESIGNED BY
+PAUL D. HUNT
+
+
+PUBLISHED BY
+ADOBE
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                18 STYLES
+OPEN FONT LICENSE (FREE)               9 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+GOOGLE FONTS (10 STYLES)
+
+
+DESIGNED BY
+ADAM TWARDOCH
+BOTIO NIKOLTCHEV
+ŁUKASZ DZIEDZIC
+
+PUBLISHED BY
+ŁUKASZ DZIEDZIC
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                16 STYLES
+COMMERCIAL (PAID)                      8 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+FONTS.COM
+MY FONTS
+FONT SHOP
+
+DESIGNED BY
+ADRIAN FRUTIGER
+AKIRA KOBAYASHI
+
+
+PUBLISHED BY
+LINOTYPE
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                10 STYLES
+APACHE LICENSE, VERSION 2.0 (FREE)     5 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+GOOGLE FONTS
+
+
+DESIGNED BY
+STEVE MATTESON
+
+
+PUBLISHED BY
+GOOGLE
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                16 STYLES
+COMMERCIAL (PAID)                      8 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+MY FONTS
+
+
+PUBLISHED BY
+DALTON MAAG
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                16 STYLES
+COMMERCIAL (PAID)                      8 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+TYPENETWORK
+
+
+DESIGNED BY
+CYRUS HIGHSMITH
+
+
+PUBLISHED BY
+FONT BUREAU
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                12 STYLES
+COMMERCIAL (PAID)                      6 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+MY FONTS
+
+
+DESIGNED BY
+PAUL D. HUNT
+
+
+PUBLISHED BY
+ADOBE
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                10 STYLES
+COMMERCIAL (PAID)                      5 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+FONTS.COM
+MY FONTS
+FONT SHOP
+
+DESIGNED BY
+NICK JOB
+
+PUBLISHED BY
+MONOTYPE
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                10 STYLES
+COMMERCIAL (PAID)                      5 WEIGHTS WITH ITALICS
+
+
+AVAILABLE FROM
+FONTS.COM
+MY FONTS
+FONT SHOP
+
+DESIGNED BY
+LINDA HINTZ
+PAUL RENNER
+TOSHI OMAGARI
+
+PUBLISHED BY
+MONOTYPE
+Refactoring UI: Font Recommendations
+Refactoring UI: Font Recommendations
+
+
+LICENSE                                10 STYLES
+COMMERCIAL (PAID)                      5 WEIGHTS WITH ITALICS
+
+AVAILABLE FROM
+ADOBE FONTS
+MY FONTS
+
+DESIGNED BY
+JONAS SCHUDEL
+
+PUBLISHED BY
+DALTON MAAG
