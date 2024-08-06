@@ -1,3 +1,28 @@
+Сейчас я расскажу о проекте в целом и стек его технологий
+
+Начнем с последнего
+== Стек
+Вся кодовая база проекта едина и написана на Rust и сопутствующих технологиях таких, как
+Leptos как системообразующий фреймворк, который взаимодействует
+на фронтенде с Tailwind
+на бэкенде с Axum
+а за базу данных у нас танцует Surrealdb
+также после построения приложения для web через описанные выше технологии
+планируется создание desktop версии для windows и других через tauri - фреймворка Rust для создания десктоп приложения
+с подключенной базой данных и всей серверной архитектурой, также реактивно работающей в своей оболочке в виде программы на windows, так и в браузере
+Можно сказать, что мы создадим персональный браузер специально для нашего проекта
+но это потом - можно о tauri пока не задумываться
+
+== О проекте
+я хочу создать мировой маркетплэйс экологически чистых продуктов, где покупатели смогут приобрести товар непосредственно у продавца и или агронома в своем городе
+
+сейчас я хочу привести в порядок общий дизайн сервиса и ты бы мог мне в этом помочь, например, используя tailwind для создания дизайна,
+который должен соответствовать общей идее нашего агрономического маркеплэйса
+
+ниже структура и содержание файлов проекта
+и я постоянно буду присылать тебе такую актуальную структуру - я же волшебник
+
+
 heads  C:\rust\projects\marketplace\05082024\heads
   .embold
   dist
@@ -8,18 +33,15 @@ heads  C:\rust\projects\marketplace\05082024\heads
 mod app;
 
 use leptos::*;
-// use console_error_panic_hook;
-
-#[component]
-fn App(cx: Scope) -> impl IntoView {
-    view! { cx,
-        <p>"Hello, world!"</p>
-    }
-}
+use app::{App, AppProps}; // Импортируем App и AppProps
 
 fn main() {
     // console_error_panic_hook::set_once(); // пока закомментировано
-    mount_to_body(|cx| view! { cx, <App /> }); // здесь можно и Layout 
+
+    // Используем leptos::mount_to_body напрямую
+    mount_to_body(|cx| {
+        view! { cx, <App /> }
+    });
 }
 </code main.rs>
     app.rs
@@ -29,7 +51,24 @@ use leptos::*;
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
     view! { cx,
-        <p>"Hello, world!"</p>
+        <div class="container mx-auto p-4">
+            <h1 class="text-4xl font-bold text-center text-green-600">"Экологический Маркетплейс"</h1>
+            <p class="mt-4 text-lg text-gray-700">"Добро пожаловать в мир экологически чистых продуктов!"</p>
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="p-4 border rounded-lg shadow-lg">
+                    <h2 class="text-2xl font-semibold">"Местные Фермеры"</h2>
+                    <p class="mt-2">"Найдите продукты напрямую от местных фермеров в вашем городе."</p>
+                </div>
+                <div class="p-4 border rounded-lg shadow-lg">
+                    <h2 class="text-2xl font-semibold">"Эко Продукты"</h2>
+                    <p class="mt-2">"Покупайте экологически чистые продукты, которые полезны для вас и окружающей среды."</p>
+                </div>
+                <div class="p-4 border rounded-lg shadow-lg">
+                    <h2 class="text-2xl font-semibold">"Поддержка Сообщества"</h2>
+                    <p class="mt-2">"Поддержите свое местное сообщество, покупая у местных производителей."</p>
+                </div>
+            </div>
+        </div>
     }
 }
 </code app.rs>    
@@ -68,11 +107,28 @@ port = 8080
   index.html
 <code index.html>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
-<head></head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ecological Marketplace</title>
+    <!-- Подключение Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
 
-<body></body>
+<body>
+    <!-- Контейнер для вашего Leptos приложения -->
+    <div id="app"></div>
+
+    <!-- Подключение скрипта вашего Leptos приложения -->
+    <script type="module">
+        import init, { App } from './pkg/heads.js';
+        init().then(() => {
+            App();
+        });
+    </script>
+</body>
 
 </html>
 </code index.html>  

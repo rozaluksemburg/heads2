@@ -1,15 +1,32 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-<link rel="modulepreload" href="/heads-a5c19900ecda4a26.js" crossorigin=anonymous integrity="sha384-D4U2uVRyrDlWFEGp/T/rxFnqd/IcsfyBx8YS64Tt9u4Zm8bJ7pcWfHQXi47pGaLb">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ecological Marketplace</title>
+    <!-- Подключение Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+<link rel="modulepreload" href="/heads-9d0b142b986779a9.js" crossorigin=anonymous integrity="sha384-Kx+y9txBCNUDHGV1bPuas//Qp3JYP17aQ7HZ/6QiQbZ+kKT8D5AqJJ85B+C9rJt5">
 <link rel="modulepreload" href="/snippets/leptos_reactive-81881a7e036355c6/inline0.js" crossorigin=anonymous integrity="sha384-d8yvubxSuBtBulKXqV75Cat9GIXWqR6k5Bgu7yCoAeqNsM97ASkJwvRGESa4d7HR">
-<link rel="preload" href="/heads-a5c19900ecda4a26_bg.wasm" crossorigin=anonymous integrity="sha384-bbC6uqgJ8MEWJTgm2YjM19CHW69ZjeG4TBlntfZ+eq+gyNuo0+8UgTh7E1zFwHA5" as="fetch" type="application/wasm"></head>
+<link rel="preload" href="/heads-9d0b142b986779a9_bg.wasm" crossorigin=anonymous integrity="sha384-p25XkPX7b79KoWEpvXlS7MBg+ozSQC8EmvEwbIlkM0xvDH7bJW8lU+LIJ+gRLS7m" as="fetch" type="application/wasm"></head>
 
 <body>
-<script type="module" nonce="1dCm7D33A8cq9FHbCn18OQ==">
-import init, * as bindings from '/heads-a5c19900ecda4a26.js';
-const wasm = await init('/heads-a5c19900ecda4a26_bg.wasm');
+    <!-- Контейнер для вашего Leptos приложения -->
+    <div id="app"></div>
+
+    <!-- Подключение скрипта вашего Leptos приложения -->
+    <script type="module">
+        import init, { App } from './pkg/heads.js';
+        init().then(() => {
+            App();
+        });
+    </script>
+
+<script type="module" nonce="uRx4faIZMqk67JoBcRMnnA==">
+import init, * as bindings from '/heads-9d0b142b986779a9.js';
+const wasm = await init('/heads-9d0b142b986779a9_bg.wasm');
 
 
 window.wasmBindings = bindings;

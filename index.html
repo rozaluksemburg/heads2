@@ -1,8 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
-<head></head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ecological Marketplace</title>
+    <!-- Подключение Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
 
-<body></body>
+<body>
+    <!-- Контейнер для вашего Leptos приложения -->
+    <div id="app"></div>
+
+    <!-- Подключение скрипта вашего Leptos приложения -->
+    <script type="module">
+        import init, { App } from './pkg/heads.js';
+        init().then(() => {
+            App();
+        });
+    </script>
+</body>
 
 </html>
