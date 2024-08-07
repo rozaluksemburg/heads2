@@ -1,8 +1,8 @@
 use leptos::*;
 
 #[component]
-pub fn App(cx: Scope) -> impl IntoView {
-    view! { cx,
+pub fn App() -> impl IntoView {
+    view! {
         <div class="container mx-auto p-4">
             <h1 class="text-4xl font-bold text-center text-green-600">"Экологический Маркетплейс"</h1>
             <p class="mt-4 text-lg text-gray-700">"Добро пожаловать в мир экологически чистых продуктов!"</p>
